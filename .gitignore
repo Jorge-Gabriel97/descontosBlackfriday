@@ -1,0 +1,11 @@
+# Banco local, logs e segredos nunca vão para o Git
+data/
+*.log
+.env
+.env.*
+
+# Editores e sistema
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
