@@ -88,63 +88,88 @@ function App() {
   return (
     <div className="app">
       <header className="topo">
+        <div className="marca">
+          descontos <span>Black Friday</span>
+        </div>
         {usuario && (
           <div className="conta">
-            <span className="suave">
-              Olá, <strong>{usuario.nome}</strong> · {usuario.email}
+            <span className="ola" title={usuario.email}>
+              Olá, <strong>{usuario.nome}</strong>
             </span>
             <button type="button" className="secundario" onClick={encerrarSessao}>
               Sair
             </button>
           </div>
         )}
-        <h1>
-          Descontos <span>Black Friday</span>
-        </h1>
-        <p>Escolha um produto, defina seu preço e receba um e-mail quando ele chegar lá.</p>
       </header>
 
-      {usuario === undefined && <p className="suave centro">Carregando...</p>}
+      <section className="destaque">
+        <h1>{usuario ? 'O que você quer monitorar hoje?' : 'Compre na hora certa. A gente avisa quando o preço cair.'}</h1>
+        <p>Escolha o produto, defina quanto quer pagar e receba um e-mail quando o preço chegar lá.</p>
 
-      {usuario === null && <TelaAcesso onEntrou={setUsuario} />}
+        {usuario === undefined && <p className="suave centro">Carregando...</p>}
+
+        {usuario === null && <TelaAcesso onEntrou={setUsuario} />}
+
+        {usuario && status && (
+          <>
+            {!status.emailConfigurado && (
+              <p className="faixa-alerta">
+                O envio de e-mail ainda não está configurado no servidor: os avisos ficam registrados, mas não
+                chegam à sua caixa de entrada. Veja “Configurar o envio de e-mail” no README.
+              </p>
+            )}
+            <div className="etapas">
+              <BuscaProdutos lojas={status.lojas} selecionado={selecionado} onSelecionar={setSelecionado} />
+              <FormMonitoramento
+                key={selecionado ? `${selecionado.loja}-${selecionado.codigo}` : 'nenhum'}
+                produto={selecionado}
+                emailConta={usuario.email}
+                onSalvar={cadastrar}
+              />
+            </div>
+          </>
+        )}
+      </section>
+
+      {usuario === null && (
+        <section className="vantagens">
+          <article>
+            <span className="icone" aria-hidden="true">1</span>
+            <h3>Escolha o produto exato</h3>
+            <p>Busque na loja e selecione o modelo que você quer, sem confundir com parecidos.</p>
+          </article>
+          <article>
+            <span className="icone" aria-hidden="true">2</span>
+            <h3>Defina o seu preço</h3>
+            <p>Diga quanto aceita pagar à vista. O app confere o preço a cada hora.</p>
+          </article>
+          <article>
+            <span className="icone" aria-hidden="true">3</span>
+            <h3>Receba no e-mail</h3>
+            <p>Quando o preço chegar lá, você recebe o aviso com o link direto da loja.</p>
+          </article>
+        </section>
+      )}
 
       {usuario && status && (
-        <>
-          {!status.emailConfigurado && (
-            <p className="faixa-alerta">
-              O envio de e-mail ainda não está configurado no servidor: os avisos ficam registrados, mas não
-              chegam à sua caixa de entrada. Veja “Configurar o envio de e-mail” no README.
-            </p>
-          )}
-
-          <div className="etapas">
-            <BuscaProdutos lojas={status.lojas} selecionado={selecionado} onSelecionar={setSelecionado} />
-            <FormMonitoramento
-              key={selecionado ? `${selecionado.loja}-${selecionado.codigo}` : 'nenhum'}
-              produto={selecionado}
-              emailConta={usuario.email}
-              onSalvar={cadastrar}
-            />
+        <section className="monitorados">
+          <h2>Seus produtos monitorados</h2>
+          {erro && <p className="erro">{erro}</p>}
+          {!erro && monitoramentos.length === 0 && <p className="suave">Nenhum produto monitorado ainda.</p>}
+          <div className="grade">
+            {monitoramentos.map((m) => (
+              <MonitoramentoCard
+                key={m.id}
+                monitoramento={m}
+                emailConta={usuario.email}
+                emailConfigurado={status.emailConfigurado}
+                onVerificar={verificar}
+                onRemover={remover}
+              />
+            ))}
           </div>
-
-          <section className="monitorados">
-            <h2>Seus produtos monitorados</h2>
-            {erro && <p className="erro">{erro}</p>}
-            {!erro && monitoramentos.length === 0 && <p className="suave">Nenhum produto monitorado ainda.</p>}
-            <div className="grade">
-              {monitoramentos.map((m) => (
-                <MonitoramentoCard
-                  key={m.id}
-                  monitoramento={m}
-                  emailConta={usuario.email}
-                  emailConfigurado={status.emailConfigurado}
-                  onVerificar={verificar}
-                  onRemover={remover}
-                />
-              ))}
-            </div>
-          </section>
-        </>
+        </section>
       )}
 
       {usuario && !status && erro && <p className="erro centro">{erro}</p>}

@@ -3,6 +3,8 @@ import { buscarNaLoja } from '../api'
 import { formatarPreco } from '../formatar'
 import type { LojaId, LojaStatus, ProdutoLoja } from '../types'
 
+const POR_PAGINA = 8
+
 interface Props {
   lojas: LojaStatus[]
   selecionado: ProdutoLoja | null
@@ -15,6 +17,7 @@ export function BuscaProdutos({ lojas, selecionado, onSelecionar }: Props) {
   const [resultados, setResultados] = useState<ProdutoLoja[] | null>(null)
   const [buscando, setBuscando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [limite, setLimite] = useState(POR_PAGINA)
 
   const nomeLoja = lojas.find((l) => l.id === loja)?.nome ?? loja
 
@@ -22,6 +25,7 @@ export function BuscaProdutos({ lojas, selecionado, onSelecionar }: Props) {
     e.preventDefault()
     setBuscando(true)
     setErro(null)
+    setLimite(POR_PAGINA)
     try {
       setResultados(await buscarNaLoja(loja, termo))
     } catch (err) {
@@ -47,7 +51,8 @@ export function BuscaProdutos({ lojas, selecionado, onSelecionar }: Props) {
           ))}
         </select>
         <input
-          placeholder={`Buscar no ${nomeLoja}, ex.: fone bluetooth jbl`}
+          placeholder="Ex.: fone bluetooth jbl"
+          aria-label={`Buscar no ${nomeLoja}`}
           value={termo}
           onChange={(e) => setTermo(e.target.value)}
           maxLength={100}
@@ -63,16 +68,19 @@ export function BuscaProdutos({ lojas, selecionado, onSelecionar }: Props) {
 
       {resultados && resultados.length > 0 && (
         <ul className="resultados">
-          {resultados.map((p) => (
+          {resultados.slice(0, limite).map((p) => (
             <li key={`${p.loja}-${p.codigo}`} className={ehSelecionado(p) ? 'ativo' : undefined}>
-              {p.imagem && <img src={p.imagem} alt="" loading="lazy" />}
+              {p.imagem ? <img src={p.imagem} alt="" loading="lazy" /> : <span className="sem-imagem" />}
               <div className="resultado-info">
                 <a href={p.link} target="_blank" rel="noreferrer">
                   {p.nome}
                 </a>
-                <span>
-                  <strong>{formatarPreco(p.precoPix)}</strong> à vista · {formatarPreco(p.preco)}
-                  {!p.disponivel && <em className="indisponivel"> · indisponível</em>}
+                <span className="precos">
+                  <span>
+                    <strong>{formatarPreco(p.precoPix)}</strong> à vista
+                  </span>
+                  <span>{formatarPreco(p.preco)} no cartão</span>
+                  {!p.disponivel && <em className="indisponivel">indisponível</em>}
                 </span>
               </div>
               <button type="button" onClick={() => onSelecionar(p)}>
@@ -81,6 +89,11 @@ export function BuscaProdutos({ lojas, selecionado, onSelecionar }: Props) {
             </li>
           ))}
         </ul>
+      )}
+      {resultados && resultados.length > limite && (
+        <button type="button" className="secundario mais" onClick={() => setLimite(limite + POR_PAGINA)}>
+          Mostrar mais ({resultados.length - limite})
+        </button>
       )}
     </section>
   )

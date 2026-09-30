@@ -91,7 +91,8 @@ export function MonitoramentoCard({ monitoramento: m, emailConta, emailConfigura
         </a>
         <div className="card-precos">
           <span className={`preco tom-${s.tom}`}>{formatarPreco(m.precoPixAtual)}</span>
-          <span className="suave">à vista · {formatarPreco(m.precoAtual)} normal</span>
+          <span className="suave">à vista</span>
+          <span className="suave">{formatarPreco(m.precoAtual)} no cartão</span>
         </div>
         <p className="suave">
           Seu preço: até <strong>{formatarPreco(m.precoMaximo)}</strong>
