@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
@@ -12,7 +13,15 @@ import org.springframework.stereotype.Component;
 import java.text.NumberFormat;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Avisa o usuário, no e-mail da conta dele, que o produto chegou ao preço desejado.
@@ -62,9 +71,41 @@ public class NotificadorEmail {
             log.info("Aviso do produto {} enviado para {}", produto.getCodigoProduto(), destino);
             return ResultadoAviso.ENVIADO;
         } catch (Exception e) {
-            log.error("Falha ao enviar e-mail para {}: {}", destino, e.getMessage());
+            log.error("Falha ao enviar e-mail para {}: {}", destino, descreverFalha(e));
+            log.debug("Detalhes da falha de e-mail", e);
             return ResultadoAviso.FALHOU;
         }
+    }
+
+    /**
+     * Junta as mensagens de toda a cadeia de causas. O Spring embrulha a resposta do servidor
+     * SMTP (ex.: "525 5.7.1 Unauthorized IP address") numa exceção de texto genérico,
+     * como "Authentication failed"; sem descer até a causa, o motivo real se perde.
+     * As exceções do JavaMail trazem só a resposta do servidor, nunca a senha ou a chave.
+     */
+    static String descreverFalha(Throwable erro) {
+        List<String> partes = new ArrayList<>();
+        Set<Throwable> vistos = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<Throwable> pendentes = new ArrayDeque<>(List.of(erro));
+        while (!pendentes.isEmpty()) {
+            Throwable atual = pendentes.poll();
+            if (!vistos.add(atual)) {
+                continue;
+            }
+            String mensagem = atual.getMessage() == null ? "" : atual.getMessage().strip().replaceAll("\\s+", " ");
+            String parte = atual.getClass().getSimpleName() + (mensagem.isEmpty() ? "" : ": " + mensagem);
+            if (partes.stream().noneMatch(p -> p.contains(mensagem) && !mensagem.isEmpty())) {
+                partes.add(parte);
+            }
+            // Falhas de envio ficam por mensagem, fora da cadeia de causas
+            if (atual instanceof MailSendException envio) {
+                pendentes.addAll(Arrays.asList(envio.getMessageExceptions()));
+            }
+            if (atual.getCause() != null) {
+                pendentes.add(atual.getCause());
+            }
+        }
+        return String.join(" <- ", partes);
     }
 
     String montarCorpo(ProdutoMonitorado p) {

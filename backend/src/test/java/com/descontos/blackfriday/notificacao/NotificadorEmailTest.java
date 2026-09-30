@@ -4,18 +4,34 @@ import com.descontos.blackfriday.loja.Loja;
 import com.descontos.blackfriday.loja.ProdutoLoja;
 import com.descontos.blackfriday.monitoramento.ProdutoMonitorado;
 import com.descontos.blackfriday.usuario.Usuario;
+import jakarta.mail.MessagingException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.math.BigDecimal;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(OutputCaptureExtension.class)
 class NotificadorEmailTest {
 
     private final ProdutoLoja produto = new ProdutoLoja(Loja.KABUM, "541147", "Cafeteira Mondial",
@@ -65,6 +81,68 @@ class NotificadorEmailTest {
         ResultadoAviso resultado = new NotificadorEmail(provedor(sender), "app@exemplo.com").notificar(monitorado());
 
         assertThat(resultado).isEqualTo(ResultadoAviso.FALHOU);
+    }
+
+    @Test
+    void logDeFalhaMostraARespostaRealDoServidorSmtp(CapturedOutput saida) throws Exception {
+        try (ServerSocket servidor = new ServerSocket(0)) {
+            Thread smtpFalso = new Thread(() -> responderComIpNaoAutorizado(servidor));
+            smtpFalso.start();
+
+            JavaMailSenderImpl sender = new JavaMailSenderImpl();
+            sender.setHost("localhost");
+            sender.setPort(servidor.getLocalPort());
+            sender.setUsername("login-teste");
+            sender.setPassword("chave-super-secreta");
+            sender.getJavaMailProperties().put("mail.smtp.auth", "true");
+            sender.getJavaMailProperties().put("mail.smtp.timeout", "5000");
+
+            ResultadoAviso resultado = new NotificadorEmail(provedor(sender), "app@exemplo.com").notificar(monitorado());
+            smtpFalso.join(5000);
+
+            assertThat(resultado).isEqualTo(ResultadoAviso.FALHOU);
+            assertThat(saida.getOut())
+                    .contains("Falha ao enviar e-mail para cliente@exemplo.com")
+                    .contains("Authentication failed")
+                    .contains("525 5.7.1 Unauthorized IP address")
+                    .doesNotContain("chave-super-secreta");
+        }
+    }
+
+    /** Imita a Brevo recusando o login de um IP não autorizado. */
+    private static void responderComIpNaoAutorizado(ServerSocket servidor) {
+        try (Socket cliente = servidor.accept();
+             BufferedReader entrada = new BufferedReader(new InputStreamReader(cliente.getInputStream(), StandardCharsets.US_ASCII));
+             Writer saida = new OutputStreamWriter(cliente.getOutputStream(), StandardCharsets.US_ASCII)) {
+            saida.write("220 smtp falso\r\n");
+            saida.flush();
+            String linha;
+            while ((linha = entrada.readLine()) != null) {
+                String comando = linha.toUpperCase(Locale.ROOT);
+                if (comando.startsWith("EHLO")) {
+                    saida.write("250-smtp falso\r\n250 AUTH PLAIN LOGIN\r\n");
+                } else if (comando.startsWith("AUTH")) {
+                    saida.write("525 5.7.1 Unauthorized IP address\r\n");
+                } else if (comando.startsWith("QUIT")) {
+                    saida.write("221 tchau\r\n");
+                    saida.flush();
+                    return;
+                } else {
+                    saida.write("250 ok\r\n");
+                }
+                saida.flush();
+            }
+        } catch (IOException ignorada) {
+            // o cliente fechou a conexão
+        }
+    }
+
+    @Test
+    void descricaoIncluiFalhasPorMensagemDoEnvio() {
+        MailSendException envio = new MailSendException(Map.of(new Object(),
+                new MessagingException("550 5.7.1 Sender not allowed")));
+
+        assertThat(NotificadorEmail.descreverFalha(envio)).contains("550 5.7.1 Sender not allowed");
     }
 
     @Test
