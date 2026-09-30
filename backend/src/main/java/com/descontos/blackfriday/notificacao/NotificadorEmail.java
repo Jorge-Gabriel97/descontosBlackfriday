@@ -1,6 +1,7 @@
 package com.descontos.blackfriday.notificacao;
 
 import com.descontos.blackfriday.monitoramento.ProdutoMonitorado;
+import com.descontos.blackfriday.usuario.Usuario;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -46,13 +47,26 @@ public class NotificadorEmail {
     }
 
     public ResultadoAviso notificar(ProdutoMonitorado produto) {
-        String destino = produto.getUsuario().getEmail();
-        String assunto = "[Descontos Black Friday] Preço caiu: " + produto.getNome();
-        String corpo = montarCorpo(produto);
+        return enviar(produto.getUsuario().getEmail(),
+                "[Descontos Black Friday] Preço caiu: " + produto.getNome(), montarCorpo(produto));
+    }
 
+    public ResultadoAviso enviarConfirmacao(Usuario usuario, String link) {
+        return enviar(usuario.getEmail(), "[Descontos Black Friday] Confirme seu e-mail", """
+                Olá, %s!
+
+                Confirme seu e-mail para receber os avisos de preço do Descontos Black Friday:
+
+                %s
+
+                O link vale por 24 horas. Se você não criou esta conta, ignore este e-mail.
+                """.formatted(usuario.getNome(), link));
+    }
+
+    private ResultadoAviso enviar(String destino, String assunto, String corpo) {
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null) {
-            log.info("E-mail não configurado; aviso que seria enviado para {}:\n{}\n\n{}", destino, assunto, corpo);
+            log.info("E-mail não configurado; mensagem que seria enviada para {}:\n{}\n\n{}", destino, assunto, corpo);
             return ResultadoAviso.EMAIL_NAO_CONFIGURADO;
         }
 
@@ -63,7 +77,7 @@ public class NotificadorEmail {
         msg.setText(corpo);
         try {
             sender.send(msg);
-            log.info("Aviso do produto {} enviado para {}", produto.getCodigoProduto(), destino);
+            log.info("E-mail \"{}\" enviado para {}", assunto, destino);
             return ResultadoAviso.ENVIADO;
         } catch (Exception e) {
             log.error("Falha ao enviar e-mail para {}: {}", destino, descreverFalha(e));

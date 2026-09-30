@@ -23,6 +23,10 @@ public class Usuario {
     @Column(nullable = false)
     private Instant criadoEm = Instant.now();
 
+    // O default vale para as contas criadas antes da confirmação por e-mail existir
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean emailConfirmado;
+
     protected Usuario() {
     }
 
@@ -41,4 +45,9 @@ public class Usuario {
     public String getEmail() { return email; }
     public String getSenhaHash() { return senhaHash; }
     public Instant getCriadoEm() { return criadoEm; }
+    public boolean isEmailConfirmado() { return emailConfirmado; }
+
+    public void confirmarEmail() {
+        this.emailConfirmado = true;
+    }
 }

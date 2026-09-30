@@ -3,6 +3,10 @@ package com.descontos.blackfriday.seguranca;
 import com.descontos.blackfriday.kabum.KabumCliente;
 import com.descontos.blackfriday.loja.Loja;
 import com.descontos.blackfriday.loja.ProdutoLoja;
+import com.descontos.blackfriday.notificacao.NotificadorEmail;
+import com.jayway.jsonpath.JsonPath;
+import org.mockito.ArgumentCaptor;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
@@ -22,7 +26,11 @@ import java.util.Optional;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,6 +47,9 @@ class LoginEMonitoramentoTest {
     @MockitoBean(answers = Answers.CALLS_REAL_METHODS)
     KabumCliente kabum;
 
+    @MockitoSpyBean
+    NotificadorEmail notificador;
+
     @BeforeEach
     void kabumFalso() {
         doAnswer(inv -> Optional.of(new ProdutoLoja(Loja.KABUM,
@@ -48,6 +59,12 @@ class LoginEMonitoramentoTest {
     }
 
     private MockHttpSession cadastrar(String email) throws Exception {
+        MockHttpSession sessao = cadastrarSemConfirmar(email);
+        mvc.perform(get(linkDeConfirmacao(email))).andExpect(status().isFound());
+        return sessao;
+    }
+
+    private MockHttpSession cadastrarSemConfirmar(String email) throws Exception {
         MvcResult res = mvc.perform(post("/api/auth/cadastro").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nome\":\"Teste\",\"email\":\"" + email + "\",\"senha\":\"senha-forte-123\"}"))
@@ -55,6 +72,13 @@ class LoginEMonitoramentoTest {
                 .andExpect(jsonPath("$.email").value(email.toLowerCase()))
                 .andReturn();
         return (MockHttpSession) res.getRequest().getSession(false);
+    }
+
+    private String linkDeConfirmacao(String email) {
+        ArgumentCaptor<String> link = ArgumentCaptor.forClass(String.class);
+        verify(notificador, atLeastOnce())
+                .enviarConfirmacao(argThat(u -> u.getEmail().equals(email.toLowerCase())), link.capture());
+        return link.getValue().replace("http://localhost:5173", "");
     }
 
     private void monitorar(MockHttpSession sessao, String codigo) throws Exception {
@@ -117,6 +141,50 @@ class LoginEMonitoramentoTest {
 
         mvc.perform(post("/api/auth/cadastro").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nome\":\"X\",\"email\":\"repetido@exemplo.com\",\"senha\":\"senha-forte-123\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void contaNaoConfirmadaRetemOAvisoAteConfirmarOEmail() throws Exception {
+        MockHttpSession sessao = cadastrarSemConfirmar("nova@exemplo.com");
+        mvc.perform(get("/api/auth/eu").session(sessao)).andExpect(jsonPath("$.emailConfirmado").value(false));
+
+        MvcResult criado = mvc.perform(post("/api/monitoramentos").session(sessao).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"loja\":\"KABUM\",\"codigoProduto\":\"77\",\"precoMaximo\":300}"))
+                .andExpect(jsonPath("$.ultimoAvisoResultado").value("EMAIL_NAO_CONFIRMADO"))
+                .andReturn();
+        Number id = JsonPath.read(criado.getResponse().getContentAsString(), "$.id");
+
+        mvc.perform(get(linkDeConfirmacao("nova@exemplo.com")))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "http://localhost:5173/?email=confirmado"));
+        mvc.perform(get("/api/auth/eu").session(sessao)).andExpect(jsonPath("$.emailConfirmado").value(true));
+        // O aviso retido sai na hora da confirmação (aqui sem SMTP, então fica como não configurado)
+        mvc.perform(get("/api/monitoramentos").session(sessao))
+                .andExpect(jsonPath("$[0].id").value(id))
+                .andExpect(jsonPath("$[0].ultimoAvisoResultado").value("EMAIL_NAO_CONFIGURADO"));
+    }
+
+    @Test
+    void linkDeConfirmacaoSoFuncionaUmaVez() throws Exception {
+        cadastrarSemConfirmar("umavez@exemplo.com");
+        String link = linkDeConfirmacao("umavez@exemplo.com");
+
+        mvc.perform(get(link)).andExpect(header().string("Location", "http://localhost:5173/?email=confirmado"));
+        mvc.perform(get(link)).andExpect(header().string("Location", "http://localhost:5173/?email=link-invalido"));
+        mvc.perform(get("/api/auth/confirmar-email").param("token", "inventado"))
+                .andExpect(header().string("Location", "http://localhost:5173/?email=link-invalido"));
+    }
+
+    @Test
+    void reenvioDaConfirmacaoTemIntervaloMinimoEPrecisaDeContaNaoConfirmada() throws Exception {
+        MockHttpSession nova = cadastrarSemConfirmar("reenvio@exemplo.com");
+        mvc.perform(post("/api/auth/reenviar-confirmacao").session(nova).with(csrf()))
+                .andExpect(status().isTooManyRequests());
+
+        MockHttpSession confirmada = cadastrar("jaconfirmada@exemplo.com");
+        mvc.perform(post("/api/auth/reenviar-confirmacao").session(confirmada).with(csrf()))
                 .andExpect(status().isConflict());
     }
 

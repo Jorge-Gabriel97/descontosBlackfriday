@@ -15,6 +15,7 @@ export interface Usuario {
   id: number
   nome: string
   email: string
+  emailConfirmado: boolean
 }
 
 export interface ProdutoLoja {
@@ -28,7 +29,7 @@ export interface ProdutoLoja {
   disponivel: boolean
 }
 
-export type ResultadoAviso = 'ENVIADO' | 'EMAIL_NAO_CONFIGURADO' | 'FALHOU'
+export type ResultadoAviso = 'ENVIADO' | 'EMAIL_NAO_CONFIGURADO' | 'EMAIL_NAO_CONFIRMADO' | 'FALHOU'
 
 export interface Monitoramento {
   id: number

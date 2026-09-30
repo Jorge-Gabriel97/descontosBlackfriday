@@ -2,40 +2,13 @@ package com.descontos.blackfriday.seguranca;
 
 import org.junit.jupiter.api.Test;
 
-import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class LimiteDeTentativasTest {
 
-    private static final class Relogio extends Clock {
-        Instant agora = Instant.parse("2026-11-27T10:00:00Z");
-
-        void avancar(Duration tempo) {
-            agora = agora.plus(tempo);
-        }
-
-        @Override
-        public Instant instant() {
-            return agora;
-        }
-
-        @Override
-        public ZoneId getZone() {
-            return ZoneOffset.UTC;
-        }
-
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
-    }
-
-    private final Relogio relogio = new Relogio();
+    private final RelogioDeTeste relogio = new RelogioDeTeste();
     private final LimiteDeTentativas limite = new LimiteDeTentativas(5, 20, Duration.ofMinutes(15), relogio);
 
     private void falhar(int vezes, String email, String ip) {

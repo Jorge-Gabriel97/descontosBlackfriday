@@ -40,7 +40,7 @@ public class SegurancaConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/cadastro", "/api/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/status").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/status", "/api/auth/confirmar-email").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

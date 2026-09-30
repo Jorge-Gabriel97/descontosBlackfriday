@@ -1,5 +1,6 @@
 package com.descontos.blackfriday.monitoramento;
 
+import com.descontos.blackfriday.config.EnumComoTexto;
 import com.descontos.blackfriday.loja.Loja;
 import com.descontos.blackfriday.loja.ProdutoLoja;
 import com.descontos.blackfriday.notificacao.ResultadoAviso;
@@ -13,6 +14,18 @@ import java.time.Instant;
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = {"usuario_id", "loja", "codigoProduto"}))
 public class ProdutoMonitorado {
 
+    public static class LojaComoTexto extends EnumComoTexto<Loja> {
+        public LojaComoTexto() {
+            super(Loja.class);
+        }
+    }
+
+    public static class ResultadoComoTexto extends EnumComoTexto<ResultadoAviso> {
+        public ResultadoComoTexto() {
+            super(ResultadoAviso.class);
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -20,7 +33,7 @@ public class ProdutoMonitorado {
     @ManyToOne(optional = false, fetch = FetchType.EAGER)
     private Usuario usuario;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = LojaComoTexto.class)
     @Column(nullable = false, length = 30)
     private Loja loja;
 
@@ -50,7 +63,7 @@ public class ProdutoMonitorado {
     @Column(precision = 12, scale = 2)
     private BigDecimal precoNotificado;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ResultadoComoTexto.class)
     @Column(length = 30)
     private ResultadoAviso ultimoAvisoResultado;
 

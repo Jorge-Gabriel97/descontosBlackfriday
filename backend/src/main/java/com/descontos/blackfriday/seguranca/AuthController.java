@@ -1,5 +1,7 @@
 package com.descontos.blackfriday.seguranca;
 
+import com.descontos.blackfriday.monitoramento.MonitoramentoService;
+import com.descontos.blackfriday.notificacao.ResultadoAviso;
 import com.descontos.blackfriday.usuario.Usuario;
 import com.descontos.blackfriday.usuario.UsuarioRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,6 +11,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -23,6 +26,9 @@ import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.net.URI;
+import java.util.Optional;
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -36,9 +42,9 @@ public class AuthController {
     public record LoginRequest(@NotBlank String email, @NotBlank String senha) {
     }
 
-    public record UsuarioResponse(Long id, String nome, String email) {
-        static UsuarioResponse de(UsuarioAutenticado u) {
-            return new UsuarioResponse(u.id(), u.nome(), u.email());
+    public record UsuarioResponse(Long id, String nome, String email, boolean emailConfirmado) {
+        static UsuarioResponse de(Usuario u) {
+            return new UsuarioResponse(u.getId(), u.getNome(), u.getEmail(), u.isEmailConfirmado());
         }
     }
 
@@ -48,11 +54,16 @@ public class AuthController {
     private final SecurityContextRepository contextos;
     private final CsrfAuthenticationStrategy csrfStrategy;
     private final LimiteDeTentativas limite;
+    private final ConfirmacaoEmail confirmacao;
+    private final MonitoramentoService monitoramentos;
 
     public AuthController(UsuarioRepository usuarios, PasswordEncoder encoder,
                           AuthenticationManager authenticationManager, SecurityContextRepository contextos,
-                          CsrfTokenRepository csrfTokens, LimiteDeTentativas limite) {
+                          CsrfTokenRepository csrfTokens, LimiteDeTentativas limite, ConfirmacaoEmail confirmacao,
+                          MonitoramentoService monitoramentos) {
+        this.monitoramentos = monitoramentos;
         this.limite = limite;
+        this.confirmacao = confirmacao;
         this.usuarios = usuarios;
         this.encoder = encoder;
         this.authenticationManager = authenticationManager;
@@ -68,7 +79,8 @@ public class AuthController {
         if (usuarios.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma conta com este e-mail");
         }
-        usuarios.save(new Usuario(req.nome().trim(), email, encoder.encode(req.senha())));
+        Usuario novo = usuarios.save(new Usuario(req.nome().trim(), email, encoder.encode(req.senha())));
+        confirmacao.enviar(novo);
         return entrar(email, req.senha(), request, response);
     }
 
@@ -93,7 +105,33 @@ public class AuthController {
 
     @GetMapping("/eu")
     public UsuarioResponse eu(@AuthenticationPrincipal UsuarioAutenticado usuario) {
-        return UsuarioResponse.de(usuario);
+        return carregar(usuario.id());
+    }
+
+    @GetMapping("/confirmar-email")
+    public ResponseEntity<Void> confirmarEmail(@RequestParam(required = false) String token) {
+        Optional<Long> confirmado = confirmacao.confirmar(token);
+        // Depois do commit da confirmação, para o SMTP não segurar a transação
+        confirmado.ifPresent(monitoramentos::enviarAvisosRetidos);
+        String resultado = confirmado.isPresent() ? "confirmado" : "link-invalido";
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(confirmacao.urlPublica() + "/?email=" + resultado))
+                .build();
+    }
+
+    @PostMapping("/reenviar-confirmacao")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void reenviarConfirmacao(@AuthenticationPrincipal UsuarioAutenticado usuario) {
+        if (confirmacao.reenviar(usuario.id()) == ResultadoAviso.FALHOU) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Não foi possível enviar o e-mail agora. Tente de novo mais tarde.");
+        }
+    }
+
+    // A sessão guarda uma cópia do usuário; a confirmação do e-mail só aparece lendo do banco
+    private UsuarioResponse carregar(Long id) {
+        return usuarios.findById(id).map(UsuarioResponse::de)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
     }
 
     private UsuarioResponse entrar(String email, String senha, HttpServletRequest request, HttpServletResponse response) {
@@ -115,6 +153,6 @@ public class AuthController {
         SecurityContextHolder.setContext(contexto);
         contextos.saveContext(contexto, request, response);
 
-        return UsuarioResponse.de((UsuarioAutenticado) auth.getPrincipal());
+        return carregar(((UsuarioAutenticado) auth.getPrincipal()).id());
     }
 }

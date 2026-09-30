@@ -4,6 +4,7 @@ import com.descontos.blackfriday.loja.Loja;
 import com.descontos.blackfriday.loja.Lojas;
 import com.descontos.blackfriday.loja.ProdutoLoja;
 import com.descontos.blackfriday.notificacao.NotificadorEmail;
+import com.descontos.blackfriday.notificacao.ResultadoAviso;
 import com.descontos.blackfriday.usuario.Usuario;
 import com.descontos.blackfriday.usuario.UsuarioRepository;
 import org.slf4j.Logger;
@@ -59,6 +60,15 @@ public class MonitoramentoService {
         return aplicarPreco(monitorado, consultarOuFalhar(monitorado.getLoja(), monitorado.getCodigoProduto()));
     }
 
+    public void enviarAvisosRetidos(Long usuarioId) {
+        repository.findAllByUsuarioIdOrderByCriadoEmDesc(usuarioId).stream()
+                .filter(m -> m.getUltimoAvisoResultado() == ResultadoAviso.EMAIL_NAO_CONFIRMADO)
+                .forEach(m -> {
+                    m.registrarAviso(notificador.notificar(m));
+                    repository.save(m);
+                });
+    }
+
     public void remover(Long usuarioId, Long id) {
         repository.delete(buscarDoUsuario(usuarioId, id));
     }
@@ -83,12 +93,13 @@ public class MonitoramentoService {
 
     private ProdutoMonitorado aplicarPreco(ProdutoMonitorado monitorado, ProdutoLoja produto) {
         boolean avisar = monitorado.registrarPreco(produto);
+        boolean confirmado = monitorado.getUsuario().isEmailConfirmado();
         log.info("Monitoramento {} ({} {}): à vista {}, máximo {}, disponível {} -> {}",
                 monitorado.getId(), monitorado.getLoja().getNome(), monitorado.getCodigoProduto(),
                 produto.precoPix(), monitorado.getPrecoMaximo(), produto.disponivel(),
-                avisar ? "enviando aviso" : "sem aviso");
+                !avisar ? "sem aviso" : confirmado ? "enviando aviso" : "aviso retido (e-mail não confirmado)");
         if (avisar) {
-            monitorado.registrarAviso(notificador.notificar(monitorado));
+            monitorado.registrarAviso(confirmado ? notificador.notificar(monitorado) : ResultadoAviso.EMAIL_NAO_CONFIRMADO);
         }
         return repository.save(monitorado);
     }

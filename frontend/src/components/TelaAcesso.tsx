@@ -67,7 +67,7 @@ export function TelaAcesso({ onEntrou }: Props) {
           {criando && <small className="suave">Mínimo de 8 caracteres.</small>}
         </label>
         {criando && (
-          <p className="suave pequeno">Os avisos de preço serão enviados para este e-mail.</p>
+          <p className="suave pequeno">Vamos enviar um link para confirmar este e-mail. Os avisos de preço chegam nele.</p>
         )}
         {erro && <p className="erro">{erro}</p>}
         <button type="submit" disabled={enviando}>

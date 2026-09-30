@@ -52,10 +52,12 @@ Ela bloqueia commits com chaves, senhas ou tokens escritos no código e com arqu
 - **Limite de tentativas de login**: 5 senhas erradas para o mesmo e-mail ou 20 vindas do mesmo IP
   bloqueiam o login por 15 minutos (`app.login.*` no `application.properties`). A contagem fica em
   memória e zera quando o backend reinicia.
+- **Confirmação do e-mail**: o cadastro envia um link válido por 24 horas. Enquanto o e-mail não é
+  confirmado, os avisos de preço ficam retidos (o card explica o motivo) e saem assim que o link é
+  usado. O link vale uma vez só, e o banco guarda apenas o hash (SHA-256) do token.
 - O console web do H2 não faz parte do app.
 
-Ainda não implementado (sugestões para próximas etapas): recuperação de senha por e-mail e
-confirmação do e-mail no cadastro.
+Ainda não implementado (sugestão para a próxima etapa): recuperação de senha por e-mail.
 
 ## Configurar o envio de e-mail
 
@@ -83,6 +85,7 @@ powershell -ExecutionPolicy Bypass -File "backend\configurar-email.ps1"
 | `SPRING_MAIL_USERNAME` | seu e-mail do Gmail | login SMTP mostrado pela Brevo |
 | `SPRING_MAIL_PASSWORD` | senha de app (16 letras) | chave SMTP |
 | `APP_MAIL_REMETENTE` | (não precisa) | e-mail confirmado em **Senders** |
+| `APP_URL_PUBLICA` | endereço do app nos links dos e-mails (padrão `http://localhost:5173`) | igual |
 
 **Gmail:** ative a verificação em duas etapas e crie uma **senha de app** em
 <https://myaccount.google.com/apppasswords>. Se a página disser que a opção não está disponível,

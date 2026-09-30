@@ -10,6 +10,7 @@ import {
   verificarAgora,
 } from './api'
 import { BuscaProdutos } from './components/BuscaProdutos'
+import { FaixaConfirmacao } from './components/FaixaConfirmacao'
 import { FormMonitoramento } from './components/FormMonitoramento'
 import { MonitoramentoCard } from './components/MonitoramentoCard'
 import { TelaAcesso } from './components/TelaAcesso'
@@ -22,6 +23,8 @@ function App() {
   const [selecionado, setSelecionado] = useState<ProdutoLoja | null>(null)
   const [monitoramentos, setMonitoramentos] = useState<Monitoramento[]>([])
   const [erro, setErro] = useState<string | null>(null)
+  // Resultado do link de confirmação, que volta como ?email=confirmado ou ?email=link-invalido
+  const [retornoEmail] = useState(() => new URLSearchParams(window.location.search).get('email'))
 
   // O /api/status também entrega o cookie CSRF usado no login
   const carregarStatus = useCallback(
@@ -45,6 +48,10 @@ function App() {
       }, tratarErro),
     [tratarErro],
   )
+
+  useEffect(() => {
+    if (retornoEmail) window.history.replaceState(null, '', window.location.pathname)
+  }, [retornoEmail])
 
   useEffect(() => {
     carregarStatus()
@@ -107,6 +114,16 @@ function App() {
         <h1>{usuario ? 'O que você quer monitorar hoje?' : 'Compre na hora certa. A gente avisa quando o preço cair.'}</h1>
         <p>Escolha o produto, defina quanto quer pagar e receba um e-mail quando o preço chegar lá.</p>
 
+        {retornoEmail === 'confirmado' && (
+          <div className="faixa-sucesso">E-mail confirmado! Os avisos de preço já estão liberados.</div>
+        )}
+        {retornoEmail === 'link-invalido' && (
+          <div className="faixa-erro">
+            Este link de confirmação é inválido ou já foi usado. Entre na sua conta e peça um novo e-mail.
+          </div>
+        )}
+        {usuario && !usuario.emailConfirmado && <FaixaConfirmacao email={usuario.email} />}
+
         {usuario === undefined && <p className="suave centro">Carregando...</p>}
 
         {usuario === null && <TelaAcesso onEntrou={setUsuario} />}
@@ -114,10 +131,10 @@ function App() {
         {usuario && status && (
           <>
             {!status.emailConfigurado && (
-              <p className="faixa-alerta">
+              <div className="faixa-alerta">
                 O envio de e-mail ainda não está configurado no servidor: os avisos ficam registrados, mas não
                 chegam à sua caixa de entrada. Veja “Configurar o envio de e-mail” no README.
-              </p>
+              </div>
             )}
             <div className="etapas">
               <BuscaProdutos lojas={status.lojas} selecionado={selecionado} onSelecionar={setSelecionado} />

@@ -43,6 +43,12 @@ function situacao(m: Monitoramento, emailConta: string, emailConfigurado: boolea
         titulo: 'Preço atingido · aviso enviado',
         detalhe: `E-mail enviado para ${emailConta} em ${formatarDataHora(m.ultimoAvisoEm)}.`,
       }
+    case 'EMAIL_NAO_CONFIRMADO':
+      return {
+        tom: 'alerta',
+        titulo: 'Preço atingido · confirme seu e-mail',
+        detalhe: `O aviso sai assim que você confirmar ${emailConta} pelo link que enviamos.`,
+      }
     case 'FALHOU':
       return {
         tom: 'erro',
