@@ -5,8 +5,11 @@ import com.descontos.blackfriday.loja.LojaCliente;
 import com.descontos.blackfriday.loja.ProdutoLoja;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,6 +23,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -29,10 +33,13 @@ import java.util.regex.Pattern;
  *
  * <p>Regras seguidas para respeitar o site (robots.txt e Políticas do KaBuM!):
  * <ul>
- *   <li>só acessa {@code /busca/<termo>} sem parâmetros de URL e {@code /produto/<codigo>},
- *       caminhos liberados no robots.txt;</li>
+ *   <li>só acessa {@code /busca/<termo>} e {@code /produto/<codigo>}, caminhos liberados no robots.txt,
+ *       sempre sem parâmetros de URL;</li>
+ *   <li>segue redirecionamentos só dentro do site, sem os parâmetros (ex.: a busca "notebook" leva a
+ *       {@code /computadores/notebooks?search-term=notebook}, e o app abre {@code /computadores/notebooks})
+ *       e nunca para caminhos que o robots.txt bloqueia;</li>
  *   <li>se identifica com um User-Agent próprio, sem se passar por navegador;</li>
- *   <li>espera um intervalo mínimo entre uma requisição e outra.</li>
+ *   <li>espera um intervalo mínimo entre uma requisição e outra, inclusive entre redirecionamentos.</li>
  * </ul>
  */
 @Component
@@ -43,20 +50,36 @@ public class KabumCliente implements LojaCliente {
     private static final Pattern NEXT_DATA =
             Pattern.compile("<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>", Pattern.DOTALL);
     private static final Pattern CODIGO_VALIDO = Pattern.compile("\\d{1,12}");
+    private static final int MAX_REDIRECIONAMENTOS = 3;
+    private static final Set<Integer> REDIRECIONAMENTOS = Set.of(301, 302, 303, 307, 308);
+    /** Caminhos bloqueados no robots.txt do KaBuM! que um redirecionamento poderia alcançar. */
+    private static final List<String> CAMINHOS_PROIBIDOS = List.of(
+            "/precarrinho", "/carrinho", "/minha-conta", "/login", "/kabum3/", "/manager/",
+            "/destaques", "/lancamentos", "/cgi-local", "/link", "/conteudo/descricao/");
+    static final String BUSCA_FALHOU = "O KaBuM! não respondeu à busca agora. Tente de novo em instantes.";
 
+    // Redirecionamentos são tratados à mão para tirar os parâmetros e checar o destino
     private final HttpClient http = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NEVER)
             .connectTimeout(Duration.ofSeconds(10))
             .build();
     private final ObjectMapper mapper = new ObjectMapper();
     private final String userAgent;
     private final long intervaloMillis;
+    private final String endereco;
     private long ultimaRequisicao;
 
+    @Autowired
     public KabumCliente(@Value("${app.kabum.user-agent}") String userAgent,
                         @Value("${app.kabum.intervalo-entre-requisicoes}") Duration intervalo) {
+        this(userAgent, intervalo, BASE);
+    }
+
+    /** Permite apontar para um servidor local nos testes; os links dos produtos continuam no KaBuM!. */
+    KabumCliente(String userAgent, Duration intervalo, String endereco) {
         this.userAgent = userAgent;
         this.intervaloMillis = intervalo.toMillis();
+        this.endereco = endereco;
     }
 
     @Override
@@ -70,7 +93,14 @@ public class KabumCliente implements LojaCliente {
         if (slug.isEmpty()) {
             return List.of();
         }
-        return baixar(BASE + "/busca/" + slug).map(this::extrairBusca).orElse(List.of());
+        // Falha do site vira erro com explicação, para a tela não confundir com "nenhum produto"
+        String html = baixar("/busca/" + slug)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, BUSCA_FALHOU));
+        if (!NEXT_DATA.matcher(html).find()) {
+            log.warn("Página de busca do KaBuM! sem os dados esperados (__NEXT_DATA__) para \"{}\"", slug);
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, BUSCA_FALHOU);
+        }
+        return extrairBusca(html);
     }
 
     @Override
@@ -79,7 +109,7 @@ public class KabumCliente implements LojaCliente {
         if (codigo == null || !CODIGO_VALIDO.matcher(codigo).matches()) {
             return Optional.empty();
         }
-        return baixar(BASE + "/produto/" + codigo).flatMap(this::extrairProduto);
+        return baixar("/produto/" + codigo).flatMap(this::extrairProduto);
     }
 
     List<ProdutoLoja> extrairBusca(String html) {
@@ -131,7 +161,39 @@ public class KabumCliente implements LojaCliente {
         return pageProps;
     }
 
-    private synchronized Optional<String> baixar(String url) {
+    private synchronized Optional<String> baixar(String caminho) {
+        for (int i = 0; i <= MAX_REDIRECIONAMENTOS; i++) {
+            String url = endereco + caminho;
+            HttpResponse<String> res;
+            try {
+                res = requisitar(url);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return Optional.empty();
+            } catch (IOException e) {
+                log.warn("Falha ao acessar {}: {}", url, e.getMessage());
+                return Optional.empty();
+            }
+            if (res.statusCode() == 200) {
+                return Optional.of(res.body());
+            }
+            if (!REDIRECIONAMENTOS.contains(res.statusCode())) {
+                log.warn("KaBuM! respondeu {} para {}", res.statusCode(), url);
+                return Optional.empty();
+            }
+            String destino = res.headers().firstValue("Location").orElse("");
+            Optional<String> proximo = caminhoPermitido(destino);
+            if (proximo.isEmpty()) {
+                log.warn("KaBuM! redirecionou {} para um endereço que o app não acessa: {}", url, destino);
+                return Optional.empty();
+            }
+            caminho = proximo.get();
+        }
+        log.warn("KaBuM! redirecionou mais de {} vezes a partir de {}", MAX_REDIRECIONAMENTOS, caminho);
+        return Optional.empty();
+    }
+
+    private HttpResponse<String> requisitar(String url) throws IOException, InterruptedException {
         try {
             aguardarIntervalo();
             HttpRequest req = HttpRequest.newBuilder(URI.create(url))
@@ -139,21 +201,33 @@ public class KabumCliente implements LojaCliente {
                     .header("Accept-Language", "pt-BR,pt;q=0.9")
                     .timeout(Duration.ofSeconds(20))
                     .build();
-            HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
-            if (res.statusCode() != 200) {
-                log.warn("KaBuM! respondeu {} para {}", res.statusCode(), url);
-                return Optional.empty();
-            }
-            return Optional.of(res.body());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return Optional.empty();
-        } catch (IOException e) {
-            log.warn("Falha ao acessar {}: {}", url, e.getMessage());
-            return Optional.empty();
+            return http.send(req, HttpResponse.BodyHandlers.ofString());
         } finally {
             ultimaRequisicao = System.currentTimeMillis();
         }
+    }
+
+    /**
+     * Caminho a seguir num redirecionamento: só dentro do KaBuM!, sem parâmetros de URL
+     * e fora dos caminhos bloqueados no robots.txt.
+     */
+    static Optional<String> caminhoPermitido(String destino) {
+        if (destino.isBlank()) {
+            return Optional.empty();
+        }
+        URI uri;
+        try {
+            uri = URI.create(BASE + "/").resolve(destino.strip());
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+        String caminho = uri.getRawPath();
+        if (!"https".equals(uri.getScheme()) || !"www.kabum.com.br".equals(uri.getHost())
+                || caminho == null || !caminho.startsWith("/") || caminho.contains("..")
+                || CAMINHOS_PROIBIDOS.stream().anyMatch(caminho::startsWith)) {
+            return Optional.empty();
+        }
+        return Optional.of(caminho);
     }
 
     private void aguardarIntervalo() throws InterruptedException {

@@ -25,6 +25,7 @@ export function BuscaProdutos({ lojas, selecionado, onSelecionar }: Props) {
     try {
       setResultados(await buscarNaLoja(loja, termo))
     } catch (err) {
+      setResultados(null)
       setErro((err as Error).message)
     } finally {
       setBuscando(false)
