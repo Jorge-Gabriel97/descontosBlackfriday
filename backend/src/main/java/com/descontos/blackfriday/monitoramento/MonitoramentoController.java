@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/** Monitoramentos do usuário logado; ninguém enxerga ou altera os de outra conta. */
 @RestController
 @RequestMapping("/api/monitoramentos")
 public class MonitoramentoController {

@@ -31,11 +31,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-/**
- * Login por sessão (cookie HttpOnly) com proteção CSRF no formato para SPAs:
- * o backend grava o token no cookie {@code XSRF-TOKEN} e o frontend o devolve
- * no cabeçalho {@code X-XSRF-TOKEN} em toda requisição que altera dados.
- */
 @Configuration
 public class SegurancaConfig {
 
@@ -61,10 +56,7 @@ public class SegurancaConfig {
         return http.build();
     }
 
-    /**
-     * O token CSRF é gerado sob demanda; este filtro o acessa em toda requisição
-     * para que o cookie XSRF-TOKEN chegue ao frontend antes do primeiro POST (login).
-     */
+    // Força a geração do token para o cookie XSRF-TOKEN chegar antes do primeiro POST (login)
     private static final class CsrfCookieFilter extends OncePerRequestFilter {
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,

@@ -28,19 +28,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Lê as páginas públicas do KaBuM!, que trazem os dados do produto como JSON
- * na tag {@code __NEXT_DATA__}.
- *
- * <p>Regras seguidas para respeitar o site (robots.txt e Políticas do KaBuM!):
- * <ul>
- *   <li>só acessa {@code /busca/<termo>} e {@code /produto/<codigo>}, caminhos liberados no robots.txt,
- *       sempre sem parâmetros de URL;</li>
- *   <li>segue redirecionamentos só dentro do site, sem os parâmetros (ex.: a busca "notebook" leva a
- *       {@code /computadores/notebooks?search-term=notebook}, e o app abre {@code /computadores/notebooks})
- *       e nunca para caminhos que o robots.txt bloqueia;</li>
- *   <li>se identifica com um User-Agent próprio, sem se passar por navegador;</li>
- *   <li>espera um intervalo mínimo entre uma requisição e outra, inclusive entre redirecionamentos.</li>
- * </ul>
+ * Lê o JSON {@code __NEXT_DATA__} das páginas públicas do KaBuM!. Respeita o robots.txt: só /busca e
+ * /produto, sem parâmetros de URL, User-Agent próprio e intervalo entre todas as requisições.
  */
 @Component
 public class KabumCliente implements LojaCliente {
@@ -52,13 +41,13 @@ public class KabumCliente implements LojaCliente {
     private static final Pattern CODIGO_VALIDO = Pattern.compile("\\d{1,12}");
     private static final int MAX_REDIRECIONAMENTOS = 3;
     private static final Set<Integer> REDIRECIONAMENTOS = Set.of(301, 302, 303, 307, 308);
-    /** Caminhos bloqueados no robots.txt do KaBuM! que um redirecionamento poderia alcançar. */
+    // Bloqueados no robots.txt
     private static final List<String> CAMINHOS_PROIBIDOS = List.of(
             "/precarrinho", "/carrinho", "/minha-conta", "/login", "/kabum3/", "/manager/",
             "/destaques", "/lancamentos", "/cgi-local", "/link", "/conteudo/descricao/");
     static final String BUSCA_FALHOU = "O KaBuM! não respondeu à busca agora. Tente de novo em instantes.";
 
-    // Redirecionamentos são tratados à mão para tirar os parâmetros e checar o destino
+    // Redirecionamentos à mão, para tirar os parâmetros e checar o destino
     private final HttpClient http = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NEVER)
             .connectTimeout(Duration.ofSeconds(10))
@@ -75,7 +64,6 @@ public class KabumCliente implements LojaCliente {
         this(userAgent, intervalo, BASE);
     }
 
-    /** Permite apontar para um servidor local nos testes; os links dos produtos continuam no KaBuM!. */
     KabumCliente(String userAgent, Duration intervalo, String endereco) {
         this.userAgent = userAgent;
         this.intervaloMillis = intervalo.toMillis();
@@ -93,7 +81,6 @@ public class KabumCliente implements LojaCliente {
         if (slug.isEmpty()) {
             return List.of();
         }
-        // Falha do site vira erro com explicação, para a tela não confundir com "nenhum produto"
         String html = baixar("/busca/" + slug)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, BUSCA_FALHOU));
         if (!NEXT_DATA.matcher(html).find()) {
@@ -105,7 +92,6 @@ public class KabumCliente implements LojaCliente {
 
     @Override
     public Optional<ProdutoLoja> consultar(String codigo) {
-        // O código vai para a URL: aceita só dígitos para não montar caminhos arbitrários
         if (codigo == null || !CODIGO_VALIDO.matcher(codigo).matches()) {
             return Optional.empty();
         }
@@ -153,7 +139,7 @@ public class KabumCliente implements LojaCliente {
             return mapper.missingNode();
         }
         JsonNode pageProps = mapper.readTree(m.group(1)).path("props").path("pageProps");
-        // Na página de busca, "data" pode vir como texto JSON dentro do JSON
+        // Na busca, "data" vem como texto JSON dentro do JSON
         JsonNode data = pageProps.path("data");
         if (data.isString()) {
             return mapper.createObjectNode().set("data", mapper.readTree(data.asString()));
@@ -207,10 +193,6 @@ public class KabumCliente implements LojaCliente {
         }
     }
 
-    /**
-     * Caminho a seguir num redirecionamento: só dentro do KaBuM!, sem parâmetros de URL
-     * e fora dos caminhos bloqueados no robots.txt.
-     */
     static Optional<String> caminhoPermitido(String destino) {
         if (destino.isBlank()) {
             return Optional.empty();

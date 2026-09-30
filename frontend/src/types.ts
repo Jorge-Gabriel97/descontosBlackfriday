@@ -17,16 +17,13 @@ export interface Usuario {
   email: string
 }
 
-/** Produto como aparece na busca de uma loja. */
 export interface ProdutoLoja {
   loja: LojaId
   codigo: string
   nome: string
   link: string
   imagem: string
-  /** Preço normal (cartão/boleto). */
   preco: number
-  /** Menor preço à vista (no KaBuM!, o PIX); usado para decidir o aviso. */
   precoPix: number
   disponivel: boolean
 }

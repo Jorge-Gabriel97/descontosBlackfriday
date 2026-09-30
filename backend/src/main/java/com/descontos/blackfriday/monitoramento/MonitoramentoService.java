@@ -63,7 +63,6 @@ public class MonitoramentoService {
         repository.delete(buscarDoUsuario(usuarioId, id));
     }
 
-    /** Consulta cada produto uma única vez, mesmo que vários usuários o monitorem. */
     @Scheduled(fixedDelayString = "${app.monitor.intervalo}", initialDelayString = "${app.monitor.atraso-inicial}")
     public void verificarTodos() {
         Map<Chave, List<ProdutoMonitorado>> porProduto = repository.findAll().stream()

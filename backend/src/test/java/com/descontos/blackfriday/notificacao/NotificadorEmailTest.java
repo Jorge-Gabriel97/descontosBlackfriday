@@ -109,7 +109,6 @@ class NotificadorEmailTest {
         }
     }
 
-    /** Imita a Brevo recusando o login de um IP não autorizado. */
     private static void responderComIpNaoAutorizado(ServerSocket servidor) {
         try (Socket cliente = servidor.accept();
              BufferedReader entrada = new BufferedReader(new InputStreamReader(cliente.getInputStream(), StandardCharsets.US_ASCII));
@@ -132,8 +131,7 @@ class NotificadorEmailTest {
                 }
                 saida.flush();
             }
-        } catch (IOException ignorada) {
-            // o cliente fechou a conexão
+        } catch (IOException clienteFechouAConexao) {
         }
     }
 

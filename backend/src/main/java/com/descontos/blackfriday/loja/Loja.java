@@ -1,9 +1,6 @@
 package com.descontos.blackfriday.loja;
 
-/**
- * Lojas conhecidas pelo app. Uma loja só fica ativa quando existe um
- * {@link LojaCliente} para ela; as demais aparecem como "em breve".
- */
+/** Uma loja só fica ativa quando existe um {@link LojaCliente} para ela. */
 public enum Loja {
     KABUM("KaBuM!"),
     SHOPEE("Shopee"),

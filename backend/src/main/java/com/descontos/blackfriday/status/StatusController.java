@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Arrays;
 import java.util.List;
 
-/** Informações públicas do servidor que a tela usa para se ajustar. */
 @RestController
 public class StatusController {
 

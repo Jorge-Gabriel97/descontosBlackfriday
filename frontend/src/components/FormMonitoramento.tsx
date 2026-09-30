@@ -9,8 +9,7 @@ interface Props {
 }
 
 export function FormMonitoramento({ produto, emailConta, onSalvar }: Props) {
-  // Sugere um preço máximo 10% abaixo do preço atual à vista. O App remonta este
-  // componente (via key) quando outro produto é selecionado.
+  // Calculado só na montagem: o App troca a key ao selecionar outro produto
   const [precoMaximo, setPrecoMaximo] = useState(() =>
     produto ? (Math.floor(produto.precoPix * 0.9 * 100) / 100).toFixed(2) : '',
   )

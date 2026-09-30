@@ -8,7 +8,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 
-/** Usuário logado, guardado na sessão. Não carrega a entidade JPA, só o necessário. */
 public record UsuarioAutenticado(Long id, String nome, String email, String senhaHash) implements UserDetails {
 
     static UsuarioAutenticado de(Usuario u) {

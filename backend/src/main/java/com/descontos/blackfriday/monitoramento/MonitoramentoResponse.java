@@ -6,7 +6,6 @@ import com.descontos.blackfriday.notificacao.ResultadoAviso;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** O que o frontend vê de um monitoramento (sem expor dados da conta do usuário). */
 public record MonitoramentoResponse(
         Long id,
         Loja loja,

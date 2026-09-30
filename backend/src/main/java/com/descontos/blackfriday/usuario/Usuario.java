@@ -14,7 +14,6 @@ public class Usuario {
     @Column(nullable = false, length = 100)
     private String nome;
 
-    /** E-mail de login e de destino dos avisos; guardado sempre em minúsculas. */
     @Column(nullable = false, unique = true)
     private String email;
 

@@ -1,6 +1,5 @@
 import type { LojaId, Monitoramento, NovoMonitoramento, ProdutoLoja, StatusServidor, Usuario } from './types'
 
-/** Erro da API com o status HTTP, para a tela reagir (ex.: 401 volta para o login). */
 export class ErroApi extends Error {
   readonly status: number
 
@@ -12,9 +11,7 @@ export class ErroApi extends Error {
 
 const SERVIDOR_FORA = 'Não foi possível conectar ao servidor. O backend está rodando na porta 8080?'
 
-// Usadas só quando a resposta vem sem mensagem. O backend sempre explica seus erros
-// (inclusive quando a loja não responde), então 502/503/504 vazio é o proxy do Vite
-// avisando que o backend está desligado.
+// Só para respostas sem mensagem: 502/503/504 vazio é o proxy do Vite com o backend desligado
 const MENSAGENS_PADRAO: Record<number, string> = {
   401: 'Sua sessão expirou. Entre novamente.',
   403: 'Sessão inválida. Recarregue a página e tente de novo.',
@@ -24,7 +21,6 @@ const MENSAGENS_PADRAO: Record<number, string> = {
   504: SERVIDOR_FORA,
 }
 
-/** Lê o token CSRF que o backend grava no cookie XSRF-TOKEN. */
 function tokenCsrf(): string | null {
   const cookie = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))
   return cookie ? decodeURIComponent(cookie.split('=')[1]) : null
@@ -54,7 +50,6 @@ async function requisitar<T>(url: string, init: RequestInit = {}): Promise<T> {
 
 const json = (corpo: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(corpo) })
 
-// Servidor e conta
 export const buscarStatus = () => requisitar<StatusServidor>('/api/status')
 export const usuarioAtual = () => requisitar<Usuario>('/api/auth/eu')
 export const entrar = (email: string, senha: string) => requisitar<Usuario>('/api/auth/login', json({ email, senha }))
@@ -62,7 +57,6 @@ export const criarConta = (nome: string, email: string, senha: string) =>
   requisitar<Usuario>('/api/auth/cadastro', json({ nome, email, senha }))
 export const sair = () => requisitar<void>('/api/auth/logout', { method: 'POST' })
 
-// Lojas e monitoramentos
 export const buscarNaLoja = (loja: LojaId, termo: string) =>
   requisitar<ProdutoLoja[]>(`/api/lojas/${loja}/busca?${new URLSearchParams({ termo })}`)
 export const listarMonitoramentos = () => requisitar<Monitoramento[]>('/api/monitoramentos')

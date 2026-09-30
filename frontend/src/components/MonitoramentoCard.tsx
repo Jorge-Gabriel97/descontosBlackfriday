@@ -18,7 +18,6 @@ interface Situacao {
   detalhe?: string
 }
 
-/** Explica, em linguagem simples, em que pé está o aviso deste produto. */
 function situacao(m: Monitoramento, emailConta: string, emailConfigurado: boolean): Situacao {
   if (m.precoPixAtual == null) {
     return { tom: 'neutro', titulo: 'Aguardando a primeira verificação' }

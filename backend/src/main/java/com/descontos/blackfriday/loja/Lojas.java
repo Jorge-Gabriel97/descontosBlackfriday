@@ -8,7 +8,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
-/** Encontra o cliente de cada loja ativa. */
 @Component
 public class Lojas {
 

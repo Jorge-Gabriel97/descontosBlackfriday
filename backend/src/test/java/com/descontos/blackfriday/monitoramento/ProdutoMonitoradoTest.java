@@ -20,7 +20,6 @@ class ProdutoMonitoradoTest {
     private final ProdutoMonitorado monitorado = new ProdutoMonitorado(
             new Usuario("Cliente", "cliente@exemplo.com", "hash"), produto("300", true), new BigDecimal("200"));
 
-    /** Simula uma verificação completa: lê o preço e, se for o caso, registra o aviso. */
     private boolean verificar(String precoPix, ResultadoAviso resultado) {
         boolean avisar = monitorado.registrarPreco(produto(precoPix, true));
         if (avisar) {

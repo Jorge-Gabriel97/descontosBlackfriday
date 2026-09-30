@@ -304,7 +304,6 @@ button.secundario:hover {
   color: var(--destaque);
 }
 
-/* Situação do aviso no card */
 .situacao {
   display: flex;
   flex-direction: column;
@@ -367,7 +366,6 @@ button.secundario:hover {
   margin-top: 6px;
 }
 
-/* Conta e acesso */
 .conta {
   display: flex;
   justify-content: flex-end;

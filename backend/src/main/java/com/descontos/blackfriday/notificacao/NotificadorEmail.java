@@ -23,12 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Avisa o usuário, no e-mail da conta dele, que o produto chegou ao preço desejado.
- *
- * <p>Segue as políticas das lojas (no KaBuM!, o tópico "Oferta"): o e-mail deixa claro
- * que não é da loja, informa quando o preço foi lido e manda conferir o preço no link.
- */
+/** O texto do e-mail segue as políticas das lojas: não é da loja, data da leitura e conferir no link. */
 @Component
 public class NotificadorEmail {
 
@@ -77,12 +72,7 @@ public class NotificadorEmail {
         }
     }
 
-    /**
-     * Junta as mensagens de toda a cadeia de causas. O Spring embrulha a resposta do servidor
-     * SMTP (ex.: "525 5.7.1 Unauthorized IP address") numa exceção de texto genérico,
-     * como "Authentication failed"; sem descer até a causa, o motivo real se perde.
-     * As exceções do JavaMail trazem só a resposta do servidor, nunca a senha ou a chave.
-     */
+    // O Spring esconde a resposta SMTP real (ex.: "525 Unauthorized IP") atrás de "Authentication failed"
     static String descreverFalha(Throwable erro) {
         List<String> partes = new ArrayList<>();
         Set<Throwable> vistos = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -97,7 +87,7 @@ public class NotificadorEmail {
             if (partes.stream().noneMatch(p -> p.contains(mensagem) && !mensagem.isEmpty())) {
                 partes.add(parte);
             }
-            // Falhas de envio ficam por mensagem, fora da cadeia de causas
+            // Falhas por mensagem ficam fora da cadeia de causas
             if (atual instanceof MailSendException envio) {
                 pendentes.addAll(Arrays.asList(envio.getMessageExceptions()));
             }

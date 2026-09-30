@@ -16,7 +16,6 @@ public class LojaController {
         this.lojas = lojas;
     }
 
-    /** Busca em uma loja para o usuário escolher o produto exato que quer monitorar. */
     @GetMapping("/{loja}/busca")
     public List<ProdutoLoja> buscar(@PathVariable Loja loja, @RequestParam @NotBlank @Size(max = 100) String termo) {
         return lojas.cliente(loja).buscar(termo);

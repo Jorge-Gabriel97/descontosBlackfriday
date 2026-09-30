@@ -27,7 +27,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Testa o login e o isolamento entre contas passando por toda a pilha HTTP + segurança. */
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:login;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc
 class LoginEMonitoramentoTest {
@@ -35,7 +34,7 @@ class LoginEMonitoramentoTest {
     @Autowired
     MockMvc mvc;
 
-    /** Usa o loja() real (lido já na criação do contexto); consultar() é trocado abaixo e nunca acessa o site. */
+    // Métodos reais porque loja() é lido na criação do contexto; consultar() é trocado nos testes
     @MockitoBean(answers = Answers.CALLS_REAL_METHODS)
     KabumCliente kabum;
 
@@ -149,7 +148,6 @@ class LoginEMonitoramentoTest {
                 .andReturn();
         String idAna = listaAna.getResponse().getContentAsString().replaceAll(".*?\"id\":(\\d+).*", "$1");
 
-        // Bia não pode verificar nem remover o monitoramento da Ana
         mvc.perform(post("/api/monitoramentos/" + idAna + "/verificar").session(bia).with(csrf()))
                 .andExpect(status().isNotFound());
         mvc.perform(delete("/api/monitoramentos/" + idAna).session(bia).with(csrf()))

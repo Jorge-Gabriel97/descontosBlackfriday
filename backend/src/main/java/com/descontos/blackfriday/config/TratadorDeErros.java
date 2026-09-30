@@ -14,7 +14,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/** Devolve todos os erros da API no mesmo formato: {@code {status, message}}, com mensagens em português. */
 @RestControllerAdvice
 public class TratadorDeErros {
 

@@ -9,10 +9,6 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Produto de uma loja escolhido pelo usuário, com o preço que ele aceita pagar.
- * O aviso vai para o e-mail da conta do usuário.
- */
 @Entity
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = {"usuario_id", "loja", "codigoProduto"}))
 public class ProdutoMonitorado {
@@ -51,7 +47,6 @@ public class ProdutoMonitorado {
 
     private boolean disponivel;
 
-    /** Menor preço já avisado com sucesso; nulo enquanto não houver aviso entregue. */
     @Column(precision = 12, scale = 2)
     private BigDecimal precoNotificado;
 
@@ -79,13 +74,7 @@ public class ProdutoMonitorado {
         this.imagem = produto.imagem();
     }
 
-    /**
-     * Registra o preço lido no site e diz se o usuário deve ser avisado.
-     *
-     * <p>Avisa quando o melhor preço (PIX) chega ao preço máximo e, depois de um
-     * aviso entregue, só volta a avisar se o preço cair ainda mais. Se o preço voltar
-     * a subir acima do máximo, a próxima queda gera um novo aviso.
-     */
+    /** Depois de um aviso entregue, só avisa de novo se o preço cair mais ou se subir e voltar. */
     public boolean registrarPreco(ProdutoLoja produto) {
         this.nome = produto.nome();
         this.link = produto.link();
@@ -103,10 +92,7 @@ public class ProdutoMonitorado {
         return precoNotificado == null || melhorPreco.compareTo(precoNotificado) < 0;
     }
 
-    /**
-     * Guarda o resultado do aviso. Só um aviso entregue conta como "já avisado";
-     * se o e-mail não saiu, a próxima verificação tenta de novo.
-     */
+    // Só um aviso entregue conta; se o e-mail falhou, a próxima verificação tenta de novo
     public void registrarAviso(ResultadoAviso resultado) {
         this.ultimoAvisoResultado = resultado;
         this.ultimoAvisoEm = Instant.now();

@@ -81,7 +81,6 @@ class KabumClienteTest {
 
     @Test
     void recusaCodigoQueNaoSejaNumerico() {
-        // Não chega a acessar o site: o código iria para a URL
         assertThat(cliente.consultar("../minha-conta")).isEmpty();
         assertThat(cliente.consultar("123?x=1")).isEmpty();
     }
@@ -133,7 +132,6 @@ class KabumClienteTest {
             assertThatThrownBy(() -> local.buscar("fora do ar"))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining(KabumCliente.BUSCA_FALHOU);
-            // Redirecionamento para caminho bloqueado no robots.txt não é seguido
             assertThatThrownBy(() -> local.buscar("pede login"))
                     .isInstanceOf(ResponseStatusException.class);
             assertThat(acessos).containsExactly("/busca/fora-do-ar", "/busca/pede-login");
@@ -164,7 +162,6 @@ class KabumClienteTest {
         return new KabumCliente("teste", Duration.ZERO, "http://localhost:" + site.getAddress().getPort());
     }
 
-    /** Imita as respostas do KaBuM! e anota cada caminho acessado (com os parâmetros, se houver). */
     private static HttpServer kabumFalso(List<String> acessos) throws IOException {
         String categoria = categoriaNotebooks();
         String produto = pagina("""
