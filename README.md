@@ -33,6 +33,14 @@ O frontend repassa as chamadas `/api` para o backend (configurado em `frontend/v
 então os dois ficam na mesma origem e o cookie de login funciona sem CORS.
 Contas e monitoramentos ficam salvos em `backend/data/` (banco H2 em arquivo).
 
+**Antes do primeiro commit**, ative a verificação de segredos (uma vez por clone):
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Ela bloqueia commits com chaves, senhas ou tokens escritos no código e com arquivos como `.env` ou `.pem`.
+
 ## Login e segurança
 
 - Conta com nome, e-mail e senha (mínimo de 8 caracteres). A senha é guardada com **BCrypt**, nunca em texto.
@@ -63,38 +71,31 @@ e salva tudo nas variáveis do seu usuário do Windows. Depois, reinicie o backe
 powershell -ExecutionPolicy Bypass -File "backend\configurar-email.ps1"
 ```
 
-As opções abaixo mostram os valores de cada provedor e como defini-los só para uma janela do PowerShell.
+### Valores de cada provedor
 
-### Opção 1 — Gmail
+| Variável | Gmail | Brevo (plano gratuito) |
+|---|---|---|
+| `SPRING_MAIL_HOST` | `smtp.gmail.com` | `smtp-relay.brevo.com` |
+| `SPRING_MAIL_PORT` | `587` | `587` |
+| `SPRING_MAIL_USERNAME` | seu e-mail do Gmail | login SMTP mostrado pela Brevo |
+| `SPRING_MAIL_PASSWORD` | senha de app (16 letras) | chave SMTP |
+| `APP_MAIL_REMETENTE` | (não precisa) | e-mail confirmado em **Senders** |
 
-1. Ative a verificação em duas etapas na conta Google.
-2. Crie uma **senha de app** em <https://myaccount.google.com/apppasswords>.
-   Se a página disser que a opção não está disponível, a conta não tem a verificação em duas etapas
-   ativa, ou é uma conta de trabalho/escola que bloqueia senhas de app. Nesse caso, use a opção 2.
+**Gmail:** ative a verificação em duas etapas e crie uma **senha de app** em
+<https://myaccount.google.com/apppasswords>. Se a página disser que a opção não está disponível,
+a conta não tem a verificação em duas etapas ativa, ou é uma conta de trabalho/escola que bloqueia
+senhas de app. Nesse caso, use a Brevo.
+
+**Brevo:** crie uma conta em <https://www.brevo.com>, confirme o e-mail remetente e, em
+**SMTP & API → SMTP**, gere uma **chave SMTP** (começa com `xsmtpsib-`; não use a da aba API keys,
+que começa com `xkeysib-`).
+
+Para testar só numa janela do PowerShell, sem salvar nada, defina as variáveis com `$env:NOME = ...`.
+Para a senha/chave, use o comando abaixo, que pede o valor escondido em vez de escrevê-lo no terminal:
 
 ```powershell
-$env:SPRING_MAIL_HOST = "smtp.gmail.com"
-$env:SPRING_MAIL_PORT = "587"
-$env:SPRING_MAIL_USERNAME = "seu.email@gmail.com"
-$env:SPRING_MAIL_PASSWORD = "senha de app de 16 letras"
-.\mvnw.cmd spring-boot:run
+$env:SPRING_MAIL_PASSWORD = [Net.NetworkCredential]::new('', (Read-Host 'Chave SMTP' -AsSecureString)).Password
 ```
-
-### Opção 2 — Brevo (plano gratuito, não precisa de senha de app)
-
-1. Crie uma conta em <https://www.brevo.com> e confirme o e-mail remetente.
-2. Em **SMTP & API → SMTP**, gere uma **chave SMTP**.
-
-```powershell
-$env:SPRING_MAIL_HOST = "smtp-relay.brevo.com"
-$env:SPRING_MAIL_PORT = "587"
-$env:SPRING_MAIL_USERNAME = "login SMTP mostrado pela Brevo"
-$env:SPRING_MAIL_PASSWORD = "chave SMTP"
-$env:APP_MAIL_REMETENTE = "seu.email.confirmado@exemplo.com"
-.\mvnw.cmd spring-boot:run
-```
-
-Use a chave da aba **SMTP** (começa com `xsmtpsib-`), não a da aba API keys (`xkeysib-`).
 
 ### Problemas comuns
 

@@ -1,0 +1,49 @@
+#!/bin/sh
+# Bloqueia commits que tragam segredos (chaves, senhas, tokens) ou arquivos de segredo.
+# Ativação (uma vez por clone):  git config core.hooksPath .githooks
+#
+# Olha só as linhas adicionadas no que está preparado para o commit (git add).
+# Valores vindos de variável de ambiente, como ${SPRING_MAIL_PASSWORD}, são permitidos.
+
+falhou=0
+
+# 1. Arquivos que nunca devem ir para o Git
+arquivos=$(git diff --cached --name-only --diff-filter=ACMR)
+proibidos=$(printf '%s\n' "$arquivos" | grep -E '(^|/)\.env(\..*)?$|\.(pem|key|p12|pfx|jks|keystore)$')
+if [ -n "$proibidos" ]; then
+    echo "ERRO: arquivo de segredo no commit:"
+    printf '  %s\n' $proibidos
+    falhou=1
+fi
+
+# 2. Conteúdo com cara de segredo
+padroes='x(smtp|key)sib-[A-Za-z0-9]{16,}'                           # chaves da Brevo
+padroes="$padroes|-----BEGIN [A-Z ]*PRIVATE KEY-----"                # chave privada
+padroes="$padroes|AKIA[0-9A-Z]{16}"                                  # AWS
+padroes="$padroes|gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{40,}"  # GitHub
+padroes="$padroes|SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}"        # SendGrid
+padroes="$padroes|AIza[0-9A-Za-z_-]{35}"                             # Google
+# Senha/token atribuído com valor literal (ex.: SPRING_MAIL_PASSWORD = "abc123...").
+# Não conta valor que começa com $ { < [ ( + ? - — variável, marcador, expressão de código
+# ou sintaxe de shell como ${VAR:+x}.
+padroes="$padroes|(PASSWORD|SENHA|SECRET|TOKEN|API_KEY|spring\.mail\.password)[\"']?[[:space:]]*[:=][[:space:]]*[\"']?[^\"'\$<[:space:]{[(+?-][^\"'[:space:]]{7,}"
+
+# Lista só os arquivos, para não repetir o segredo no terminal
+for arquivo in $(git diff --cached --name-only --diff-filter=ACMR -- . ':(exclude).githooks/*'); do
+    if git diff --cached -U0 -- "$arquivo" | grep -E '^\+[^+]' | grep -qE "$padroes"; then
+        [ "$falhou" -eq 0 ] || [ -n "$avisou" ] || echo ""
+        [ -n "$avisou" ] || echo "ERRO: possível segredo nas linhas adicionadas de:"
+        avisou=1
+        echo "  $arquivo"
+        falhou=1
+    fi
+done
+
+if [ "$falhou" -ne 0 ]; then
+    echo ""
+    echo "Commit bloqueado. Guarde o valor em variável de ambiente e use um marcador"
+    echo "como <sua-chave> na documentação. Se for alarme falso, revise com cuidado"
+    echo "e use: git commit --no-verify"
+    exit 1
+fi
+exit 0
