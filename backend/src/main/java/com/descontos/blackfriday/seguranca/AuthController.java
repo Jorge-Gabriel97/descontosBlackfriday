@@ -42,6 +42,12 @@ public class AuthController {
     public record LoginRequest(@NotBlank String email, @NotBlank String senha) {
     }
 
+    public record EsqueciSenhaRequest(@NotBlank @Email @Size(max = 255) String email) {
+    }
+
+    public record RedefinirSenhaRequest(@NotBlank String token, @NotBlank @Size(min = 8, max = 72) String senha) {
+    }
+
     public record UsuarioResponse(Long id, String nome, String email, boolean emailConfirmado) {
         static UsuarioResponse de(Usuario u) {
             return new UsuarioResponse(u.getId(), u.getNome(), u.getEmail(), u.isEmailConfirmado());
@@ -56,12 +62,14 @@ public class AuthController {
     private final LimiteDeTentativas limite;
     private final ConfirmacaoEmail confirmacao;
     private final MonitoramentoService monitoramentos;
+    private final RecuperacaoSenha recuperacao;
 
     public AuthController(UsuarioRepository usuarios, PasswordEncoder encoder,
                           AuthenticationManager authenticationManager, SecurityContextRepository contextos,
                           CsrfTokenRepository csrfTokens, LimiteDeTentativas limite, ConfirmacaoEmail confirmacao,
-                          MonitoramentoService monitoramentos) {
+                          MonitoramentoService monitoramentos, RecuperacaoSenha recuperacao) {
         this.monitoramentos = monitoramentos;
+        this.recuperacao = recuperacao;
         this.limite = limite;
         this.confirmacao = confirmacao;
         this.usuarios = usuarios;
@@ -125,6 +133,21 @@ public class AuthController {
         if (confirmacao.reenviar(usuario.id()) == ResultadoAviso.FALHOU) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "Não foi possível enviar o e-mail agora. Tente de novo mais tarde.");
+        }
+    }
+
+    @PostMapping("/esqueci-senha")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void esqueciSenha(@Valid @RequestBody EsqueciSenhaRequest req) {
+        recuperacao.pedir(req.email());
+    }
+
+    @PostMapping("/redefinir-senha")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void redefinirSenha(@Valid @RequestBody RedefinirSenhaRequest req) {
+        if (!recuperacao.redefinir(req.token(), req.senha())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Este link é inválido, já foi usado ou expirou. Peça um novo em \"Esqueci minha senha\".");
         }
     }
 

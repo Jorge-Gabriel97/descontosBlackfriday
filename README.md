@@ -55,9 +55,11 @@ Ela bloqueia commits com chaves, senhas ou tokens escritos no código e com arqu
 - **Confirmação do e-mail**: o cadastro envia um link válido por 24 horas. Enquanto o e-mail não é
   confirmado, os avisos de preço ficam retidos (o card explica o motivo) e saem assim que o link é
   usado. O link vale uma vez só, e o banco guarda apenas o hash (SHA-256) do token.
+- **Recuperação de senha**: "Esqueci minha senha" envia um link válido por 30 minutos, de uso único
+  (o banco guarda só o hash do token). A resposta é a mesma para e-mails com e sem conta, e o pedido
+  roda em segundo plano para o tempo de resposta também não revelar isso. Trocar a senha confirma o
+  e-mail e libera um bloqueio por tentativas de login.
 - O console web do H2 não faz parte do app.
-
-Ainda não implementado (sugestão para a próxima etapa): recuperação de senha por e-mail.
 
 ## Configurar o envio de e-mail
 
@@ -154,7 +156,8 @@ AliExpress) são as APIs oficiais ou de afiliados, que exigem cadastro e credenc
 
 ## API
 
-Todas as rotas, exceto `status`, `auth/cadastro` e `auth/login`, exigem login.
+Todas as rotas, exceto `status`, `auth/cadastro`, `auth/login`, `auth/confirmar-email`, `auth/esqueci-senha` e
+`auth/redefinir-senha`, exigem login.
 Requisições que alteram dados precisam do cabeçalho `X-XSRF-TOKEN`.
 
 | Método | Caminho | Descrição |
@@ -163,6 +166,10 @@ Requisições que alteram dados precisam do cabeçalho `X-XSRF-TOKEN`.
 | POST | `/api/auth/cadastro` | Cria conta `{nome, email, senha}` e já entra |
 | POST | `/api/auth/login` | Entra `{email, senha}` |
 | POST | `/api/auth/logout` | Sai |
+| GET | `/api/auth/confirmar-email?token=...` | Link do e-mail de confirmação (redireciona para a tela) |
+| POST | `/api/auth/reenviar-confirmacao` | Reenvia o e-mail de confirmação |
+| POST | `/api/auth/esqueci-senha` | Envia o link para criar uma nova senha `{email}` |
+| POST | `/api/auth/redefinir-senha` | Troca a senha `{token, senha}` |
 | GET | `/api/auth/eu` | Usuário logado |
 | GET | `/api/lojas/{loja}/busca?termo=...` | Busca produtos em uma loja (ex.: `KABUM`) |
 | GET | `/api/monitoramentos` | Lista os monitoramentos do usuário |

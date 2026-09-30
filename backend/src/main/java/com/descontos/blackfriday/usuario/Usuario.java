@@ -47,6 +47,10 @@ public class Usuario {
     public Instant getCriadoEm() { return criadoEm; }
     public boolean isEmailConfirmado() { return emailConfirmado; }
 
+    public void trocarSenha(String senhaHash) {
+        this.senhaHash = senhaHash;
+    }
+
     public void confirmarEmail() {
         this.emailConfirmado = true;
     }

@@ -14,6 +14,7 @@ import { FaixaConfirmacao } from './components/FaixaConfirmacao'
 import { FormMonitoramento } from './components/FormMonitoramento'
 import { MonitoramentoCard } from './components/MonitoramentoCard'
 import { TelaAcesso } from './components/TelaAcesso'
+import { TelaNovaSenha } from './components/TelaNovaSenha'
 import type { Monitoramento, NovoMonitoramento, ProdutoLoja, StatusServidor, Usuario } from './types'
 
 function App() {
@@ -25,6 +26,8 @@ function App() {
   const [erro, setErro] = useState<string | null>(null)
   // Resultado do link de confirmação, que volta como ?email=confirmado ou ?email=link-invalido
   const [retornoEmail] = useState(() => new URLSearchParams(window.location.search).get('email'))
+  const [tokenNovaSenha, setTokenNovaSenha] = useState(() => new URLSearchParams(window.location.search).get('redefinir'))
+  const [senhaAlterada, setSenhaAlterada] = useState(false)
 
   // O /api/status também entrega o cookie CSRF usado no login
   const carregarStatus = useCallback(
@@ -50,8 +53,8 @@ function App() {
   )
 
   useEffect(() => {
-    if (retornoEmail) window.history.replaceState(null, '', window.location.pathname)
-  }, [retornoEmail])
+    if (window.location.search) window.history.replaceState(null, '', window.location.pathname)
+  }, [])
 
   useEffect(() => {
     carregarStatus()
@@ -122,13 +125,24 @@ function App() {
             Este link de confirmação é inválido ou já foi usado. Entre na sua conta e peça um novo e-mail.
           </div>
         )}
-        {usuario && !usuario.emailConfirmado && <FaixaConfirmacao email={usuario.email} />}
+        {senhaAlterada && <div className="faixa-sucesso">Senha alterada! Entre com a nova senha.</div>}
+        {usuario && !usuario.emailConfirmado && !tokenNovaSenha && <FaixaConfirmacao email={usuario.email} />}
+
+        {tokenNovaSenha && (
+          <TelaNovaSenha
+            token={tokenNovaSenha}
+            onConcluido={() => {
+              setTokenNovaSenha(null)
+              setSenhaAlterada(true)
+            }}
+          />
+        )}
 
         {usuario === undefined && <p className="suave centro">Carregando...</p>}
 
-        {usuario === null && <TelaAcesso onEntrou={setUsuario} />}
+        {usuario === null && !tokenNovaSenha && <TelaAcesso onEntrou={setUsuario} />}
 
-        {usuario && status && (
+        {usuario && status && !tokenNovaSenha && (
           <>
             {!status.emailConfigurado && (
               <div className="faixa-alerta">

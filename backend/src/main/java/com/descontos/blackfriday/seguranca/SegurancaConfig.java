@@ -39,7 +39,8 @@ public class SegurancaConfig {
                                 SecurityContextRepository contextos) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/cadastro", "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/cadastro", "/api/auth/login",
+                                "/api/auth/esqueci-senha", "/api/auth/redefinir-senha").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/status", "/api/auth/confirmar-email").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/**").authenticated()

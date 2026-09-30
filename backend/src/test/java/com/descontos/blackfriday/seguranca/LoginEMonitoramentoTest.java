@@ -27,7 +27,10 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -186,6 +189,73 @@ class LoginEMonitoramentoTest {
         MockHttpSession confirmada = cadastrar("jaconfirmada@exemplo.com");
         mvc.perform(post("/api/auth/reenviar-confirmacao").session(confirmada).with(csrf()))
                 .andExpect(status().isConflict());
+    }
+
+    private MockHttpServletRequestBuilder esqueciSenha(String email) {
+        return post("/api/auth/esqueci-senha").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + email + "\"}");
+    }
+
+    private MockHttpServletRequestBuilder redefinirSenha(String token, String senha) {
+        return post("/api/auth/redefinir-senha").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + token + "\",\"senha\":\"" + senha + "\"}");
+    }
+
+    // O pedido roda em segundo plano, por isso a espera
+    private String tokenDeRedefinicao(String email) {
+        ArgumentCaptor<String> link = ArgumentCaptor.forClass(String.class);
+        verify(notificador, timeout(5000))
+                .enviarRedefinicaoSenha(argThat(u -> u.getEmail().equals(email)), link.capture());
+        return link.getValue().substring(link.getValue().indexOf("redefinir=") + "redefinir=".length());
+    }
+
+    @Test
+    void esqueciASenhaTrocaASenhaComLinkDeUsoUnico() throws Exception {
+        cadastrar("esqueci@exemplo.com");
+        mvc.perform(esqueciSenha("ESQUECI@exemplo.com")).andExpect(status().isNoContent());
+        String token = tokenDeRedefinicao("esqueci@exemplo.com");
+
+        mvc.perform(redefinirSenha(token, "nova-senha-456")).andExpect(status().isNoContent());
+
+        mvc.perform(login("esqueci@exemplo.com", "senha-forte-123", "10.1.0.1")).andExpect(status().isUnauthorized());
+        mvc.perform(login("esqueci@exemplo.com", "nova-senha-456", "10.1.0.2")).andExpect(status().isOk());
+        mvc.perform(redefinirSenha(token, "outra-senha-789"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(startsWith("Este link é inválido")));
+    }
+
+    @Test
+    void esqueciASenhaRespondeIgualParaEmailSemConta() throws Exception {
+        mvc.perform(esqueciSenha("sem-conta@exemplo.com")).andExpect(status().isNoContent());
+
+        verify(notificador, after(500).never()).enviarRedefinicaoSenha(any(), anyString());
+    }
+
+    @Test
+    void redefinirSenhaLiberaOBloqueioEConfirmaOEmail() throws Exception {
+        cadastrarSemConfirmar("travada@exemplo.com");
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(login("travada@exemplo.com", "chute-" + i, "10.2.0.1"));
+        }
+        mvc.perform(login("travada@exemplo.com", "senha-forte-123", "10.2.0.2")).andExpect(status().isTooManyRequests());
+
+        mvc.perform(esqueciSenha("travada@exemplo.com")).andExpect(status().isNoContent());
+        mvc.perform(redefinirSenha(tokenDeRedefinicao("travada@exemplo.com"), "nova-senha-456"))
+                .andExpect(status().isNoContent());
+
+        MvcResult entrou = mvc.perform(login("travada@exemplo.com", "nova-senha-456", "10.2.0.3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emailConfirmado").value(true))
+                .andReturn();
+        mvc.perform(get("/api/auth/eu").session((MockHttpSession) entrou.getRequest().getSession(false)))
+                .andExpect(jsonPath("$.emailConfirmado").value(true));
+    }
+
+    @Test
+    void novaSenhaCurtaEhRecusada() throws Exception {
+        mvc.perform(redefinirSenha("qualquer", "1234567"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(startsWith("Senha: ")));
     }
 
     @Test

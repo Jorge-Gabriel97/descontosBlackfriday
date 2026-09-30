@@ -63,6 +63,19 @@ public class NotificadorEmail {
                 """.formatted(usuario.getNome(), link));
     }
 
+    public ResultadoAviso enviarRedefinicaoSenha(Usuario usuario, String link) {
+        return enviar(usuario.getEmail(), "[Descontos Black Friday] Crie uma nova senha", """
+                Olá, %s!
+
+                Recebemos um pedido para criar uma nova senha na sua conta do Descontos Black Friday:
+
+                %s
+
+                O link vale por 30 minutos e funciona uma vez só. Se você não fez esse pedido,
+                ignore este e-mail: sua senha atual continua valendo.
+                """.formatted(usuario.getNome(), link));
+    }
+
     private ResultadoAviso enviar(String destino, String assunto, String corpo) {
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null) {

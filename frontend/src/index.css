@@ -589,6 +589,12 @@ button.mais {
   text-align: left;
 }
 
+.esqueci {
+  align-self: flex-end;
+  margin-top: -6px;
+  font-size: 0.85rem;
+}
+
 .troca-modo {
   margin: 16px 0 0;
   text-align: center;

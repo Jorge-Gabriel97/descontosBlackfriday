@@ -56,6 +56,9 @@ export const entrar = (email: string, senha: string) => requisitar<Usuario>('/ap
 export const criarConta = (nome: string, email: string, senha: string) =>
   requisitar<Usuario>('/api/auth/cadastro', json({ nome, email, senha }))
 export const sair = () => requisitar<void>('/api/auth/logout', { method: 'POST' })
+export const esqueciSenha = (email: string) => requisitar<void>('/api/auth/esqueci-senha', json({ email }))
+export const redefinirSenha = (token: string, senha: string) =>
+  requisitar<void>('/api/auth/redefinir-senha', json({ token, senha }))
 export const reenviarConfirmacao = () => requisitar<void>('/api/auth/reenviar-confirmacao', { method: 'POST' })
 
 export const buscarNaLoja = (loja: LojaId, termo: string) =>
