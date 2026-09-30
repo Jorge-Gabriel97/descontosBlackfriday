@@ -9,3 +9,6 @@ data/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Instruções locais do Claude Code (não vão para o GitHub)
+CLAUDE.md
