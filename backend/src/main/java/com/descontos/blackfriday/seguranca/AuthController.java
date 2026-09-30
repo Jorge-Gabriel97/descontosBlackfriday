@@ -47,10 +47,12 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository contextos;
     private final CsrfAuthenticationStrategy csrfStrategy;
+    private final LimiteDeTentativas limite;
 
     public AuthController(UsuarioRepository usuarios, PasswordEncoder encoder,
                           AuthenticationManager authenticationManager, SecurityContextRepository contextos,
-                          CsrfTokenRepository csrfTokens) {
+                          CsrfTokenRepository csrfTokens, LimiteDeTentativas limite) {
+        this.limite = limite;
         this.usuarios = usuarios;
         this.encoder = encoder;
         this.authenticationManager = authenticationManager;
@@ -73,7 +75,20 @@ public class AuthController {
     @PostMapping("/login")
     public UsuarioResponse login(@Valid @RequestBody LoginRequest req,
                                  HttpServletRequest request, HttpServletResponse response) {
-        return entrar(req.email(), req.senha(), request, response);
+        String email = Usuario.normalizarEmail(req.email());
+        String ip = request.getRemoteAddr();
+        if (limite.bloqueado(email, ip)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Muitas tentativas. Tente de novo em " + limite.bloqueio().toMinutes() + " minutos.");
+        }
+        try {
+            UsuarioResponse usuario = entrar(email, req.senha(), request, response);
+            limite.registrarSucesso(email);
+            return usuario;
+        } catch (ResponseStatusException e) {
+            limite.registrarFalha(email, ip);
+            throw e;
+        }
     }
 
     @GetMapping("/eu")

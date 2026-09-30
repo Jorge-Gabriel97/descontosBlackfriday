@@ -49,10 +49,13 @@ Ela bloqueia commits com chaves, senhas ou tokens escritos no código e com arqu
   cabeçalho `X-XSRF-TOKEN` em toda requisição que altera dados.
 - No login, o id da sessão e o token CSRF são trocados (evita fixação de sessão).
 - Cada usuário só vê e altera os próprios monitoramentos; a API responde 404 para os de outra conta.
-- O console web do H2 fica desligado.
+- **Limite de tentativas de login**: 5 senhas erradas para o mesmo e-mail ou 20 vindas do mesmo IP
+  bloqueiam o login por 15 minutos (`app.login.*` no `application.properties`). A contagem fica em
+  memória e zera quando o backend reinicia.
+- O console web do H2 não faz parte do app.
 
-Ainda não implementado (sugestões para próximas etapas): recuperação de senha por e-mail,
-confirmação do e-mail no cadastro e limite de tentativas de login.
+Ainda não implementado (sugestões para próximas etapas): recuperação de senha por e-mail e
+confirmação do e-mail no cadastro.
 
 ## Configurar o envio de e-mail
 

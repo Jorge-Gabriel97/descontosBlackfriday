@@ -14,6 +14,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -117,6 +118,32 @@ class LoginEMonitoramentoTest {
         mvc.perform(post("/api/auth/cadastro").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nome\":\"X\",\"email\":\"repetido@exemplo.com\",\"senha\":\"senha-forte-123\"}"))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void cincoSenhasErradasBloqueiamOLoginMesmoComASenhaCerta() throws Exception {
+        cadastrar("alvo@exemplo.com");
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(login("alvo@exemplo.com", "chute-" + i, "10.0.0.1")).andExpect(status().isUnauthorized());
+        }
+
+        mvc.perform(login("ALVO@exemplo.com", "senha-forte-123", "10.0.0.2"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.message").value("Muitas tentativas. Tente de novo em 15 minutos."));
+        // Mesma resposta para e-mail sem conta: o bloqueio não revela quem está cadastrado
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(login("ninguem@exemplo.com", "chute-" + i, "10.0.0.3")).andExpect(status().isUnauthorized());
+        }
+        mvc.perform(login("ninguem@exemplo.com", "chute", "10.0.0.4")).andExpect(status().isTooManyRequests());
+    }
+
+    private static MockHttpServletRequestBuilder login(String email, String senha, String ip) {
+        return post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + email + "\",\"senha\":\"" + senha + "\"}")
+                .with(req -> {
+                    req.setRemoteAddr(ip);
+                    return req;
+                });
     }
 
     @Test
