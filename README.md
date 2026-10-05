@@ -183,5 +183,9 @@ Erros voltam como `{status, message}`, com a mensagem em português.
 
 ```bash
 cd backend && ./mvnw test
-cd frontend && npm run build && npm run lint
+cd frontend && npm test && npm run build && npm run lint
 ```
+
+No frontend, `npm test` roda o Vitest com Testing Library (jsdom), sem precisar do backend: cobre a tela de
+acesso, as mensagens de erro da API e a situação mostrada em cada card. `npm run test:watch` roda em modo
+contínuo.
