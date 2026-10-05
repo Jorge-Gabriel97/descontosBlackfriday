@@ -43,6 +43,8 @@ public class SegurancaConfig {
                                 "/api/auth/esqueci-senha", "/api/auth/redefinir-senha").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/status", "/api/auth/confirmar-email").permitAll()
                         .requestMatchers("/error").permitAll()
+                        // Frontend compilado, servido pelo próprio backend em produção (mesma origem, sem CORS)
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.svg").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf.spa().csrfTokenRepository(csrfTokens))

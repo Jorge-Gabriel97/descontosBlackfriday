@@ -164,6 +164,8 @@ public class AuthController {
         } catch (AuthenticationException e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "E-mail ou senha inválidos");
         }
+        UsuarioAutenticado usuario = ((UsuarioAutenticado) auth.getPrincipal()).semSenha();
+        auth = UsernamePasswordAuthenticationToken.authenticated(usuario, null, usuario.getAuthorities());
 
         // Troca o id da sessão e o token CSRF no login (evita fixação de sessão)
         if (request.getSession(false) != null) {
@@ -176,6 +178,6 @@ public class AuthController {
         SecurityContextHolder.setContext(contexto);
         contextos.saveContext(contexto, request, response);
 
-        return carregar(((UsuarioAutenticado) auth.getPrincipal()).id());
+        return carregar(usuario.id());
     }
 }

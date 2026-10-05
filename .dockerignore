@@ -1,0 +1,11 @@
+.git
+.github
+.githooks
+**/node_modules
+**/dist
+**/target
+backend/data
+**/*.log
+**/.env
+**/.env.*
+CLAUDE.md

@@ -14,6 +14,11 @@ public record UsuarioAutenticado(Long id, String nome, String email, String senh
         return new UsuarioAutenticado(u.getId(), u.getNome(), u.getEmail(), u.getSenhaHash());
     }
 
+    // A sessão é gravada no banco; o hash da senha só serve para o login e não precisa ir junto
+    UsuarioAutenticado semSenha() {
+        return new UsuarioAutenticado(id, nome, email, null);
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_USUARIO"));

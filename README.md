@@ -11,12 +11,12 @@ Lojas: **KaBuM!** (ativa). Shopee, Mercado Livre, Amazon e AliExpress aparecem c
 
 | Parte | Tecnologia | Pasta |
 |---|---|---|
-| Backend (API, login, verificação agendada, e-mail) | Java 17, Spring Boot 4, Spring Security, H2 | `backend/` |
+| Backend (API, login, verificação agendada, e-mail) | Java 17, Spring Boot 4, Spring Security, PostgreSQL (H2 no computador), Flyway | `backend/` |
 | Frontend | Node.js, React, TypeScript, Vite | `frontend/` |
 
 ## Como rodar
 
-Pré-requisitos: Java 17+ e Node.js 20+. O Maven não precisa estar instalado (o projeto usa o `mvnw`).
+Pré-requisitos: Java 17+ e Node.js 22.12+. O Maven não precisa estar instalado (o projeto usa o `mvnw`).
 
 ```bash
 # Terminal 1 — backend em http://localhost:8080
@@ -33,7 +33,10 @@ Abra <http://localhost:5173>, clique em **Criar conta** e comece a monitorar.
 
 O frontend repassa as chamadas `/api` para o backend (configurado em `frontend/vite.config.ts`),
 então os dois ficam na mesma origem e o cookie de login funciona sem CORS.
-Contas e monitoramentos ficam salvos em `backend/data/` (banco H2 em arquivo).
+No computador, contas e monitoramentos ficam salvos em `backend/data/` (banco H2 em arquivo); em
+produção, no PostgreSQL. As tabelas são criadas pelas migrações do Flyway em
+`backend/src/main/resources/db/migration`: toda mudança no banco é um arquivo `V<n>__descricao.sql` novo,
+nunca a edição de um que já existe.
 
 **Antes do primeiro commit**, ative a verificação de segredos (uma vez por clone):
 
@@ -47,6 +50,8 @@ Ela bloqueia commits com chaves, senhas ou tokens escritos no código e com arqu
 
 - Conta com nome, e-mail e senha (mínimo de 8 caracteres). A senha é guardada com **BCrypt**, nunca em texto.
 - O login usa **sessão com cookie `HttpOnly`** (o JavaScript da página não consegue lê-lo). A sessão expira após 7 dias sem uso.
+  Ela fica gravada no banco (Spring Session JDBC), então reiniciar o servidor não desloga ninguém. Em
+  produção o cookie também é `Secure` (só trafega por HTTPS).
 - **Proteção CSRF**: o backend entrega um token no cookie `XSRF-TOKEN` e o frontend o devolve no
   cabeçalho `X-XSRF-TOKEN` em toda requisição que altera dados.
 - No login, o id da sessão e o token CSRF são trocados (evita fixação de sessão).
@@ -116,6 +121,29 @@ $env:SPRING_MAIL_PASSWORD = [Net.NetworkCredential]::new('', (Read-Host 'Chave S
   em produção, use um domínio próprio autenticado na Brevo.
 - O log do backend registra cada verificação (`Monitoramento N (...) -> enviando aviso / sem aviso`)
   e cada envio (`Aviso do produto ... enviado` ou `Falha ao enviar e-mail`).
+
+## Publicar no Railway
+
+O `Dockerfile` da raiz monta uma imagem só: compila o frontend, coloca dentro do backend e roda o jar no
+perfil `prod`. Assim a API e a página ficam na mesma origem, sem CORS. O `railway.json` diz ao Railway
+para usar esse Dockerfile e conferir `/api/status` antes de liberar cada deploy.
+
+1. No Railway, crie um projeto a partir deste repositório do GitHub e adicione um banco **PostgreSQL**.
+2. No serviço do app, em **Variables**, configure:
+
+   | Variável | Valor |
+   |---|---|
+   | `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` | referências ao banco: `${{Postgres.PGHOST}}` e assim por diante |
+   | `APP_URL_PUBLICA` | o endereço público do app, com `https://` |
+   | `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `APP_MAIL_REMETENTE` | os mesmos da [configuração de e-mail](#configurar-o-envio-de-e-mail) |
+
+3. Em **Settings → Networking**, gere um domínio. O HTTPS é automático.
+
+O IP de saída do Railway muda, então na Brevo o bloqueio por IP (**Security → Authorized IPs**) precisa
+ficar desligado; a proteção passa a ser a chave SMTP, guardada só nas variáveis do Railway.
+
+O CI monta a mesma imagem e a sobe com um PostgreSQL a cada push, então um Dockerfile quebrado aparece
+antes do deploy.
 
 ## Regras de aviso
 
@@ -193,4 +221,5 @@ acesso, as mensagens de erro da API e a situação mostrada em cada card. `npm r
 contínuo.
 
 O GitHub Actions (`.github/workflows/ci.yml`) roda os testes do backend e os testes, o lint e o build do
-frontend a cada push no `main` e em cada pull request.
+frontend a cada push no `main` e em cada pull request, e também monta a imagem Docker e a sobe com um
+PostgreSQL para conferir a API e a página.

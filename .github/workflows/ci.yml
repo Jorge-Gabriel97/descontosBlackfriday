@@ -45,3 +45,30 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build
+
+  imagem:
+    name: Imagem Docker (como no Railway)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          # Banco descartável do CI; o valor curto também não dispara o hook de segredos
+          POSTGRES_PASSWORD: teste
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t descontos .
+      - name: Sobe o container no perfil prod e confere a API e o frontend
+        run: |
+          docker run -d --name app --network host \
+            -e PGHOST=localhost -e PGPORT=5432 -e PGDATABASE=postgres -e PGUSER=postgres -e PGPASSWORD=teste \
+            -e APP_URL_PUBLICA=http://localhost:8080 descontos
+          for i in $(seq 1 60); do curl -fs http://localhost:8080/api/status > /dev/null && break; sleep 2; done
+          curl -fsS http://localhost:8080/api/status
+          curl -fsS http://localhost:8080/ | grep -q '<div id="root">'
+          docker logs app | grep -q 'Successfully applied 2 migrations'
+      - if: failure()
+        run: docker logs app
