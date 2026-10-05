@@ -1,5 +1,7 @@
 # Descontos Black Friday
 
+[![CI](https://github.com/Jorge-Gabriel97/descontosBlackfriday/actions/workflows/ci.yml/badge.svg)](https://github.com/Jorge-Gabriel97/descontosBlackfriday/actions/workflows/ci.yml)
+
 Monitor de preços em lojas online. O usuário cria uma conta, busca um produto, seleciona
 o item exato e define o preço máximo que aceita pagar. O app verifica o preço a cada hora
 e envia um aviso **para o e-mail da conta** quando o preço à vista chega ao valor definido.
@@ -189,3 +191,6 @@ cd frontend && npm test && npm run build && npm run lint
 No frontend, `npm test` roda o Vitest com Testing Library (jsdom), sem precisar do backend: cobre a tela de
 acesso, as mensagens de erro da API e a situação mostrada em cada card. `npm run test:watch` roda em modo
 contínuo.
+
+O GitHub Actions (`.github/workflows/ci.yml`) roda os testes do backend e os testes, o lint e o build do
+frontend a cada push no `main` e em cada pull request.
